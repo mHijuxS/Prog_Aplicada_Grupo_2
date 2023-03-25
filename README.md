@@ -1,2 +1,2 @@
-# Projeto1 Prog Aplicada
-Projeto 1 do grupo 2 da matéria de programação aplicada da turma IME XXIV
+# programacao_aplicada_IME_template
+Template de exemplo das soluções dos projetos de engenharia da disciplina Programação Aplicada do Instituto Militar de Engenharia
