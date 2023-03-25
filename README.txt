@@ -1,10 +1,10 @@
 Plugin Builder Results
 
-Your plugin ProgramacaoAplicadaGrupoX was created in:
-    C:/Users/borba.1CGEO/Documents\programacao_aplicada_grupo_x
+Your plugin ProgramacaoAplicadaGrupo2 was created in:
+    C:/Users/Mathe/OneDrive/Área de trabalho/programacao_aplicada_grupo_2
 
 Your QGIS plugin directory is located at:
-    C:/Users/borba.1CGEO/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins
+    C:/Users/Mathe/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins
 
 What's Next:
 

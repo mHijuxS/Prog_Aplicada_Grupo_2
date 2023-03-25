@@ -3,17 +3,17 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=ProgramacaoAplicadaGrupoX
+name=ProgramacaoAplicadaGrupo2
 qgisMinimumVersion=3.22
-description=Solução do Grupo X
+description=Solução do Grupo 2
 version=0.11
-author=Grupo X
+author=Grupo 2
 email=borba.philipe@ime.eb.br
 
-about=Soluções dos projetos de programação aplicada do grupo X
+about=Soluções dos projetos de programação aplicada do grupo 2
 
 tracker=http://bugs
-repository=http://repo
+repository=https://github.com/mHijuxS/Projeto1_Prog_Aplicada
 # End of mandatory metadata
 
 # Recommended items:
@@ -25,7 +25,7 @@ hasProcessingProvider=yes
 # Tags are comma separated with spaces allowed
 tags=python
 
-homepage=http://homepage
+homepage=https://github.com/mHijuxS/Projeto1_Prog_Aplicada
 category=Analysis
 icon=icon.png
 # experimental flag
