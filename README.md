@@ -1,2 +1,2 @@
-# programacao_aplicada_IME_template
-Soluções do projeto 1 da disciplina Programação Aplicada do Instituto Militar de Engenharia.
+# Programação aplicada IME
+Soluções do grupo 2 para o projeto 1 da disciplina Programação Aplicada do Instituto Militar de Engenharia.
