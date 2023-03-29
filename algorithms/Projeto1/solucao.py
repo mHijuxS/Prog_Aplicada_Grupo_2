@@ -35,6 +35,7 @@ from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
+                       QCoreApplication,
                        QgsProcessingParameterFeatureSink)
 
 
@@ -58,6 +59,27 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
     OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processando', string)
+        
+    def createInstance(self):
+        return Projeto1Solucao()
+        
+    def name(self):
+        return 'Projeto_1_Solucao'
+
+    def displayName(self):
+        return 'Projeto_1_Solucao'
+
+    def group(self):
+        return 'Solucao do projeto 1'
+
+    def groupId(self):
+        return 'Solucao_do_projeto_1'
+        
+    def shortHelpString(self):
+        return self.tr("Exemplo do algoritmo")
 
     def initAlgorithm(self, config):
         """
