@@ -35,8 +35,8 @@ from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
-                       QCoreApplication,
-                       QgsProcessingParameterFeatureSink)
+                       QgsProcessingParameterFeatureSink
+                        )
 
 
 class Projeto1Solucao(QgsProcessingAlgorithm):
