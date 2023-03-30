@@ -30,11 +30,15 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
+from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
+                       QgsWkbTypes,
+                       QgsFields,
+                       QgsField,
                        QgsProcessingParameterFeatureSink
                         )
 
@@ -57,8 +61,8 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
+    OUTPUT = 'OUTPUT'
 
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -137,9 +141,35 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(parameters, self.INPUT, context)
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                context, source.fields(), source.wkbType(), source.sourceCrs())
+        source = self.parameterAsSource(parameters, 
+                                        self.INPUT, 
+                                        context
+                                        )
+
+
+        #Criar uma lista de campos de atributo
+        fields = QgsFields()
+        
+        #Adicionar um campo de inteiro chamado "id"
+        field_id = QgsField('id',QVariant.Int)
+        fields.append(field_id)
+        
+        #analogamente para "erro"
+        field_erro = QgsField('erro',QVariant.Int)
+        fields.append(field_erro)
+        
+        
+        (sink, dest_id) = self.parameterAsSink(parameters,
+                                               self.OUTPUT,
+                                               context,
+                                               fields, 
+                                               QgsWkbTypes.Point, 
+                                               source.sourceCrs()
+                                               )
+
+
+
+
 
         # Compute the number of steps to display within the progress bar and
         # get features from source
