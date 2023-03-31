@@ -36,6 +36,7 @@ from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterRasterLayer,
                        QgsWkbTypes,
                        QgsFields,
                        QgsField,
@@ -107,7 +108,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
     def shortHelpString(self):
         return self.tr("Exemplo do algoritmo")
 
-    def initAlgorithm(self, config):
+    def initAlgorithm(self, config=None):
         """
         Here we define the inputs and output of the algorithm, along
         with some other properties.
@@ -115,13 +116,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
         # We add the input vector features source. It can have any kind of
         # geometry.
-        self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT,
-                self.tr('Input layer'),
-                [QgsProcessing.TypeRaster]
-            )
-        )
+        self.addParameter(QgsProcessingParameterRasterLayer('INPUT', 'Source raster'))
 
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
