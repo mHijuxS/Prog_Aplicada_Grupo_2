@@ -40,7 +40,7 @@ from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProject,
-                       QgsVectorlayer,
+                       QgsVectorLayer,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
