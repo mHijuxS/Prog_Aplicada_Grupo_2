@@ -30,26 +30,24 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
-import csv
-
-from sys import argv
-script, input_file, EPSG_code, delimiter, export_shp = argv
-import csv
-import osgeo.ogr, osgeo.osr #we will need some packages
-from osgeo import ogr
 
 
+import pandas as pd
+import geopandas as gpd
 
 from qgis.utils import iface
 from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
+                       QgsProject,
+                       QgsVectorlayer,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
                        QgsCoordinateReferenceSystem,
                        QgsProcessingParameterRasterLayer,
-                       QgsWkbTypes,
+                       QgsGeometry,
+                       QgsPointXY,
                        QgsFields,
                        QgsField,
                        QgsProcessingParameterFeatureSink
@@ -155,33 +153,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                                         )
 
        
-        spatialReference = osgeo.osr.SpatialReference() #will create a spatial reference locally to tell the system what the reference will be
-        spatialReference.ImportFromEPSG(31982) #here we define this reference to be the EPSG code
-        driver = osgeo.ogr.GetDriverByName('ESRI Shapefile') # will select the driver for our shp-file creation.
-        shapeData = driver.CreateDataSource(export_shp) #so there we will store our data
-        layer = shapeData.CreateLayer('layer', spatialReference, osgeo.ogr.wkbPoint) #this will create a corresponding layer for our data with given spatial information.
-        layer_defn = layer.GetLayerDefn() # gets parameters of the current shapefile
-        index = 0
         
-        coord_file = "C:/Users/Usuário/Documents/IME XXIV/PROG APL/Projeto_1/LEONARDO CHARLES FERNANDES - pontos_controle.csv"
-        with open(coord_file, 'rb') as csvfile:
-            readerDict = csv.DictReader(csvfile, delimiter=delimiter)
-        for field in readerDict.fieldnames:
-            new_field = ogr.FieldDefn(field, ogr.OFTString) #we will create a new field with the content of our header
-            layer.CreateField(new_field)
-        for row in readerDict:
-            print(row['x'], row['y'])
-            point = osgeo.ogr.Geometry(osgeo.ogr.wkbPoint)
-            point.AddPoint(float(row['x']), float(row['y'])) #we do have LATs and LONs as Strings, so we convert them
-            feature = osgeo.ogr.Feature(layer_defn)
-            feature.SetGeometry(point) #set the coordinates
-            feature.SetFID(index)
-            for field in readerDict.fieldnames:
-                i = feature.GetFieldIndex(field)
-                feature.SetField(i, row[field])
-            layer.CreateFeature(feature)
-            index += 1
-        shapeData.Destroy() #lets close the shapefile
 
         #Cria uma lista de campos de atributo
         fields = QgsFields()
@@ -199,11 +171,18 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                                                self.OUTPUT,
                                                context,
                                                fields, 
-                                               QgsWkbTypes.Point, 
+                                               QgsPointXY, 
                                                source.sourceCrs()
                                                )
 
+        #Converte CSV para Shapefile
+        df = pd.read_csv('C:/Users/Usuário/Documents/IME XXIV/PROG APL/Projeto_1/pontos_controle.csv')
+        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y))
+        gdf.to_file('pontos_de_controle.shp', driver='ESRI Shapefile')
 
+        #Carrega Shapefile no QGIS
+        layer = QgsVectorLayer('pontos_de_controle.shp', 'pontos_de_controle', 'ogr')
+        QgsProject.instance().addMapLayer(layer)
 
 
 
