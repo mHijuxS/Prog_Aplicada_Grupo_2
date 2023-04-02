@@ -40,10 +40,12 @@ from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProject,
+                       QgsProcessingUtils,
                        QgsVectorLayer,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
-                       QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterFile,
+                       QgsProcessingParameterVectorLayer,
                        QgsCoordinateReferenceSystem,
                        QgsProcessingParameterRasterLayer,
                        QgsVectorFileWriter,
@@ -76,8 +78,9 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    INPUT = 'INPUT'
-    OUTPUT = 'OUTPUT'
+    INPUT_CSV = 'INPUT_CSV'
+    INPUT_RASTER = 'INPUT_RASTER'
+    OUTPUT_LAYER = 'OUTPUT_LAYER'
 
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -121,27 +124,35 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         
     def shortHelpString(self):
         return self.tr("Exemplo do algoritmo")
-
+    
+    def outputFileName(self, parameters, output_layer, extension):
+        # code to construct the output file name here
+        return output_file
+    
+    
     def initAlgorithm(self, config=None):
         """
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
 
-        # We add the input vector features source. It can have any kind of
-        # geometry.
-        self.addParameter(QgsProcessingParameterRasterLayer('INPUT', 'Source raster'))
+        self.addParameter(QgsProcessingParameterFile(
+            self.INPUT_CSV,
+            'Input CSV file',
+            extension='csv'
+        ))         
+        self.addParameter(QgsProcessingParameterRasterLayer(
+            self.INPUT_RASTER,
+            'Input raster layer',
+        ))
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUTPUT_LAYER,
+            'Output layer',
+            type=QgsProcessing.TypeVectorPoint
+        ))
 
-        # We add a feature sink in which to store our processed features (this
-        # usually takes the form of a newly created vector layer when the
-        # algorithm is run in QGIS).
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.OUTPUT,
-                self.tr('Output layer')
-            )
-        )
 
+      
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -150,25 +161,22 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-       
-        source = self.parameterAsSource(parameters, 
-                                        self.INPUT, 
-                                        context
-                                        )
+       # Get input parameters
+        input_csv = self.parameterAsString(parameters, self.INPUT_CSV, context)
+        input_raster = self.parameterAsRasterLayer(parameters,self.INPUT_RASTER, context)
 
         #Convert CSV to Shapefile
-        df = pd.read_csv('C:/Users/Usuário/Documents/IME XXIV/PROG APL/Projeto_1/pontos_controle.csv')
+        df = pd.read_csv(input_csv)
         gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y, df.z))
         gdf.to_file('pontos_de_controle.shp', driver='ESRI Shapefile')
 
         #Load Shapefile into QGIS
         layer_points_control = QgsVectorLayer('pontos_de_controle.shp', 'points', 'ogr')
-
-        # Get the selected raster layer
-        raster_layer = source
+        if not layer_points_control.isValid():
+            raise Exception('Failed to load input layer')
 
         # Get the coordinate systems of the layers
-        raster_crs = raster_layer.crs()
+        raster_crs = input_raster.crs()
         point_crs = layer_points_control.crs()
 
         # Create a new point layer with the same CRS as the point layer
@@ -176,18 +184,24 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         fields.append(QgsField('x', QVariant.Double))
         fields.append(QgsField('y', QVariant.Double))
         fields.append(QgsField('erro', QVariant.Double))
-        writer = QgsVectorFileWriter('point_control.shp', 'UTF-8', fields, QgsWkbTypes.Point, point_crs, 'ESRI Shapefile')
+        writer = QgsVectorFileWriter(
+            self.parameterAsOutputLayer(parameters, self.OUTPUT_LAYER, context),
+            'UTF-8',
+            fields,
+            QgsWkbTypes.Point,
+            point_crs,
+            'ESRI Shapefile'
+        )
 
         # get the data provider for the layer
-        provider = raster_layer.dataProvider()
+        provider = input_raster.dataProvider()
 
         # Write the filtered points to the new layer
         for feat in layer_points_control.getFeatures():
-            if raster_layer.extent().contains(feat.geometry().boundingBox()):
+            if input_raster.extent().contains(feat.geometry().boundingBox()):
                 geom = feat.geometry()
                 x, y = geom.asPoint()
                 point = QgsPointXY(x,y)
-                provider = raster_layer.dataProvider()
                 pixel_value = provider.identify(point, QgsRaster.IdentifyFormatValue).results()[1]
                 z = feat.attributes()[2]
                 erro = z - pixel_value
@@ -198,21 +212,15 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
         # Save and add the new layer to the QGIS project
         del writer
-
+        
+        output_layer = self.parameterAsOutputLayer(parameters, self.OUTPUT_LAYER, context)
         new_layer = QgsVectorLayer('point_control.shp', 'pontos_de_controle', 'ogr')
-        
-
-        (sink, dest_id) = self.parameterAsSink(parameters,
-                                               self.OUTPUT,
-                                               context
-                                            )
-
-        
-        
+        QgsProject.instance().addMapLayer(new_layer)
+            
         # Compute the number of steps to display within the progress bar and
         # get features from source
-        total = 100.0 / source.featureCount() if source.featureCount() else 0
-        features = source.getFeatures()
+        total = 100.0 / input_raster.featureCount() if input_raster.featureCount() else 0
+        features = input_raster.getFeatures()
 
         for current, feature in enumerate(features):
             # Stop the algorithm if cancel button has been clicked
@@ -228,6 +236,11 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
-        return {self.OUTPUT: dest_id}
+
+        return {self.OUTPUT_LAYER: output_layer}
+
+
+
+
 
     
