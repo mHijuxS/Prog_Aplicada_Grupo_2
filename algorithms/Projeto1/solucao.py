@@ -242,19 +242,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         else:
             feedback.pushInfo("Não conforme")
             
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
-        #total = 100.0 / input_raster.featureCount() if input_raster.featureCount() else 0
-        #features = input_raster.getFeatures()
-
-        #for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
-        #    if feedback.isCanceled():
-        #        break
-
-            # Update the progress bar
-        #    feedback.setProgress(int(current * total))
-
+        
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
         # algorithms may return multiple feature sinks, calculated numeric
