@@ -124,7 +124,13 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         return 'Projeto 1'
         
     def shortHelpString(self):
-        return self.tr("Exemplo do algoritmo")
+        return self.tr("""Esse algoritmo tem como objetivo determinar a acurácia 
+                          absoluta de 6 modelos de superfície. Criando uma camada 
+                          temporária com atributo erro, o qual contém o vlaor de 
+                          e_z. Além disso, as camadas são carregadas de modo que 
+                          sua simbologia permita analisar espacialmente a distri-
+                          buição dos erros """
+                       )
     
     
     def initAlgorithm(self, config=None):
