@@ -126,10 +126,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
     def shortHelpString(self):
         return self.tr("Exemplo do algoritmo")
     
-    def outputFileName(self, parameters, output_layer, extension):
-        # code to construct the output file name here
-        return output_file
-    
     
     def initAlgorithm(self, config=None):
         """
