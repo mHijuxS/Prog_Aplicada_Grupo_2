@@ -53,6 +53,7 @@ from qgis.core import (QgsProcessing,
                        QgsPointXY,
                        QgsFields,
                        QgsField,
+                       QgsRaster,
                        QgsProcessingParameterFeatureSink
                     )
 
@@ -164,7 +165,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         layer_points_control = QgsVectorLayer('pontos_de_controle.shp', 'points', 'ogr')
 
         # Get the selected raster layer
-        raster_layer = iface.activeLayer()
+        raster_layer = source
 
         # Get the coordinate systems of the layers
         raster_crs = raster_layer.crs()
@@ -199,12 +200,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         del writer
 
         new_layer = QgsVectorLayer('point_control.shp', 'pontos_de_controle', 'ogr')
-        QgsProject.instance().addMapLayer(new_layer)
-
-
-
-
-
+        
 
         (sink, dest_id) = self.parameterAsSink(parameters,
                                                self.OUTPUT,
@@ -225,9 +221,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
             # Stop the algorithm if cancel button has been clicked
             if feedback.isCanceled():
                 break
-
-            # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
 
             # Update the progress bar
             feedback.setProgress(int(current * total))
