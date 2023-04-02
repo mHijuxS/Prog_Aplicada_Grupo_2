@@ -191,7 +191,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                             context,
                             fields,
                             QgsWkbTypes.Point,
-                            point_crs
+                            raster_crs
         )
 
         # get the data provider for the layer
@@ -260,10 +260,4 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
 
-        return {self.OUTPUT_LAYER: dest_id}
-
-
-
-
-
-    
+        return {self.OUTPUT_LAYER: dest_id} 
