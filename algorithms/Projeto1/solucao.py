@@ -50,11 +50,11 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterRasterLayer,
                        QgsVectorFileWriter,
                        QgsCoordinateTransform,
-                       QgsFeature,
                        QgsWkbTypes,
                        QgsGeometry,
                        QgsPointXY,
                        QgsFields,
+                       QgsFeature,
                        QgsField,
                        QgsRaster,
                        QgsProcessingParameterFeatureSink
@@ -146,12 +146,12 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
             self.INPUT_RASTER,
             'Input raster layer',
         ))
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.OUTPUT_LAYER,
-                'Camada de saída',
-                )
-        )
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUTPUT_LAYER,
+            'Output layer',
+            type=QgsProcessing.TypeVectorPoint
+        ))
+
 
       
     def processAlgorithm(self, parameters, context, feedback):
@@ -185,25 +185,22 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         fields.append(QgsField('x', QVariant.Double))
         fields.append(QgsField('y', QVariant.Double))
         fields.append(QgsField('erro', QVariant.Double))
-        (sink, dest_id) = self.parameterAsSink(
-                parameters, 
-                self.OUTPUT_LAYER, 
-                context, 
-                fields, 
-                QgsWkbTypes.Point 
-               )
-        writer = QgsVectorFileWriter(
-            sink,
-            'UTF-8',
-            fields,
-            QgsWkbTypes.Point,
-            point_crs,
-            'ESRI Shapefile'
+        (sink,dest_id) = self.parameterAsSink(
+                            parameters, 
+                            self.OUTPUT_LAYER, 
+                            context,
+                            fields,
+                            QgsWkbTypes.Point,
+                            point_crs
         )
 
         # get the data provider for the layer
         provider = input_raster.dataProvider()
-
+        
+        
+        EMQ = 0
+        counter = 0
+        
         # Write the filtered points to the new layer
         for feat in layer_points_control.getFeatures():
             if input_raster.extent().contains(feat.geometry().boundingBox()):
@@ -212,27 +209,49 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                 point = QgsPointXY(x,y)
                 pixel_value = provider.identify(point, QgsRaster.IdentifyFormatValue).results()[1]
                 z = feat.attributes()[2]
-                erro = z - pixel_value
+                erro = abs(z - pixel_value)
                 new_feat = QgsFeature()
-                new_feat.setGeometry(geom)
+                new_feat.setGeometry(QgsGeometry.fromPointXY(point))
                 new_feat.setAttributes([x, y, erro])
-                writer.addFeature(new_feat)
-
-        # Save and add the new layer to the QGIS project
-        del writer
+                sink.addFeature(new_feat)
+                EMQ = EMQ + erro**2
+                counter = counter + 1
+        EMQ = (EMQ/counter)**1/2
         
+        feedback.pushInfo(f"EMQ = {EMQ}")
+
+        A_EP = 1.67
+        B_EP = 3.33
+        C_EP = 4.0
+        D_EP = 5.0
+
+        if (EMQ < A_EP):
+            feedback.pushInfo("A classe é a A")
+
+        elif (A_EP < EMQ < B_EP):
+            feedback.pushInfo("A classe é a B")
+            
+        elif (B_EP <EMQ < C_EP):
+            feedback.pushInfo("A classe é a C")
+
+        elif (C_EP < EMQ < D_EP):
+            feedback.pushInfo("A classe é a D")
+
+        else:
+            feedback.pushInfo("Não conforme")
+            
         # Compute the number of steps to display within the progress bar and
         # get features from source
-        total = 100.0 / new_layer.featureCount() if new_layer.featureCount() else 0
-        features = new_layer.getFeatures()
+        #total = 100.0 / input_raster.featureCount() if input_raster.featureCount() else 0
+        #features = input_raster.getFeatures()
 
-        for current, feature in enumerate(features):
+        #for current, feature in enumerate(features):
             # Stop the algorithm if cancel button has been clicked
-            if feedback.isCanceled():
-                break
+        #    if feedback.isCanceled():
+        #        break
 
             # Update the progress bar
-            feedback.setProgress(int(current * total))
+        #    feedback.setProgress(int(current * total))
 
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
@@ -241,13 +260,9 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
 
-        return {self.OUTPUT_LAYER: sink}
+        return {self.OUTPUT_LAYER: dest_id}
 
 
-
-
-
-    
 
 
 
