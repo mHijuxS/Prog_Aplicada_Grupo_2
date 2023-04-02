@@ -204,11 +204,8 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
         (sink, dest_id) = self.parameterAsSink(parameters,
                                                self.OUTPUT,
-                                               context,
-                                               fields, 
-                                               QgsPointXY, 
-                                               source.sourceCrs()
-                                               )
+                                               context
+                                            )
 
         
         
