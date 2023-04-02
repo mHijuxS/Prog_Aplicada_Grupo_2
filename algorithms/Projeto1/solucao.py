@@ -31,7 +31,7 @@ __copyright__ = '(C) 2023 by Grupo 2'
 __revision__ = '$Format:%H$'
 
 
-
+import rasterio
 import pandas as pd
 import geopandas as gpd
 
@@ -46,12 +46,15 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsCoordinateReferenceSystem,
                        QgsProcessingParameterRasterLayer,
+                       QgsVectorFileWriter,
+                       QgsCoordinateTransform,
+                       QgsWkbTypes,
                        QgsGeometry,
                        QgsPointXY,
                        QgsFields,
                        QgsField,
                        QgsProcessingParameterFeatureSink
-                        )
+                    )
 
 
 class Projeto1Solucao(QgsProcessingAlgorithm):
@@ -152,21 +155,57 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                                         context
                                         )
 
-       
-        
+        #Convert CSV to Shapefile
+        df = pd.read_csv('C:/Users/Usuário/Documents/IME XXIV/PROG APL/Projeto_1/pontos_controle.csv')
+        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y, df.z))
+        gdf.to_file('pontos_de_controle.shp', driver='ESRI Shapefile')
 
-        #Cria uma lista de campos de atributo
+        #Load Shapefile into QGIS
+        layer_points_control = QgsVectorLayer('pontos_de_controle.shp', 'points', 'ogr')
+
+        # Get the selected raster layer
+        raster_layer = iface.activeLayer()
+
+        # Get the coordinate systems of the layers
+        raster_crs = raster_layer.crs()
+        point_crs = layer_points_control.crs()
+
+        # Create a new point layer with the same CRS as the point layer
         fields = QgsFields()
-        
-        #Adiciona um campo de inteiro chamado "id"
-        field_id = QgsField('id',QVariant.Int)
-        fields.append(field_id)
-        
-        #analogamente para "erro"
-        field_erro = QgsField('erro',QVariant.Int)
-        fields.append(field_erro)
-        
-        
+        fields.append(QgsField('x', QVariant.Double))
+        fields.append(QgsField('y', QVariant.Double))
+        fields.append(QgsField('erro', QVariant.Double))
+        writer = QgsVectorFileWriter('point_control.shp', 'UTF-8', fields, QgsWkbTypes.Point, point_crs, 'ESRI Shapefile')
+
+        # get the data provider for the layer
+        provider = raster_layer.dataProvider()
+
+        # Write the filtered points to the new layer
+        for feat in layer_points_control.getFeatures():
+            if raster_layer.extent().contains(feat.geometry().boundingBox()):
+                geom = feat.geometry()
+                x, y = geom.asPoint()
+                point = QgsPointXY(x,y)
+                provider = raster_layer.dataProvider()
+                pixel_value = provider.identify(point, QgsRaster.IdentifyFormatValue).results()[1]
+                z = feat.attributes()[2]
+                erro = z - pixel_value
+                new_feat = QgsFeature()
+                new_feat.setGeometry(geom)
+                new_feat.setAttributes([x, y, erro])
+                writer.addFeature(new_feat)
+
+        # Save and add the new layer to the QGIS project
+        del writer
+
+        new_layer = QgsVectorLayer('point_control.shp', 'pontos_de_controle', 'ogr')
+        QgsProject.instance().addMapLayer(new_layer)
+
+
+
+
+
+
         (sink, dest_id) = self.parameterAsSink(parameters,
                                                self.OUTPUT,
                                                context,
@@ -175,17 +214,8 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                                                source.sourceCrs()
                                                )
 
-        #Converte CSV para Shapefile
-        df = pd.read_csv('C:/Users/Usuário/Documents/IME XXIV/PROG APL/Projeto_1/pontos_controle.csv')
-        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y))
-        gdf.to_file('pontos_de_controle.shp', driver='ESRI Shapefile')
-
-        #Carrega Shapefile no QGIS
-        layer = QgsVectorLayer('pontos_de_controle.shp', 'pontos_de_controle', 'ogr')
-        QgsProject.instance().addMapLayer(layer)
-
-
-
+        
+        
         # Compute the number of steps to display within the progress bar and
         # get features from source
         total = 100.0 / source.featureCount() if source.featureCount() else 0
