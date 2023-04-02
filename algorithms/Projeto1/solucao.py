@@ -252,12 +252,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # or output names.
         
         # Configurando o estilo da camada
-        
-        OUTPUT_LAYER = {
-            'INPUT': sink,
-            'STYLE': 'estilo-erro-altimetrico.qml'
-        }
-        UTPUT_LAYER = processing.run('native:setlayerstyle', OUTPUT_LAYER, context=context, feedback=feedback, is_child_algorithm=True)
 
        
         return {self.OUTPUT_LAYER: dest_id}
