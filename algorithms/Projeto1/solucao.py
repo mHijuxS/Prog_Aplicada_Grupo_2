@@ -9,9 +9,7 @@
                               -------------------
         begin                : 2023-03-20
         copyright            : (C) 2023 by Grupo 2
-        email                : matheus.ferreira@ime.eb.br
-                               leonardo.fernandes@ime.eb.br
-                               daniel.nojima@ime.eb.br
+        email                : borba.philipe@ime.eb.br
  ***************************************************************************/
 
 /***************************************************************************
@@ -37,6 +35,7 @@ __revision__ = '$Format:%H$'
 import pandas as pd
 import geopandas as gpd
 
+from qgis import processing
 from qgis.utils import iface
 from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
@@ -251,5 +250,18 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
+        
+        # Configurando o estilo da camada
+        
+        OUTPUT_LAYER = {
+            'INPUT': sink,
+            'STYLE': 'estilo-erro-altimetrico.qml'
+        }
+        UTPUT_LAYER = processing.run('native:setlayerstyle', OUTPUT_LAYER, context=context, feedback=feedback, is_child_algorithm=True)
 
-        return {self.OUTPUT_LAYER: dest_id} 
+       
+        return {self.OUTPUT_LAYER: dest_id}
+        
+        # Configurando o estilo da camada
+
+ 
