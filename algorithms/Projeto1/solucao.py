@@ -9,7 +9,9 @@
                               -------------------
         begin                : 2023-03-20
         copyright            : (C) 2023 by Grupo 2
-        email                : borba.philipe@ime.eb.br
+        email                : matheus.ferreira@ime.eb.br
+                               leonardo.fernandes@ime.eb.br
+                               daniel.nojima@ime.eb.br
  ***************************************************************************/
 
 /***************************************************************************
