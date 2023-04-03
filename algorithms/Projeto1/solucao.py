@@ -61,6 +61,8 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSink
                     )
 
+# Importações adicionais
+from qgis.core import QgsSymbol, QgsRendererCategory, QgsCategorizedSymbolRenderer, QgsMarkerSymbol
 
 class Projeto1Solucao(QgsProcessingAlgorithm):
     """
@@ -156,6 +158,18 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         ))
 
 
+    def apply_error_based_size(self, layer, error_field_index, scale_factor=1.0):
+        symbol = QgsMarkerSymbol.createSimple({})
+        renderer = QgsCategorizedSymbolRenderer('{}'.format(layer.fields()[error_field_index].name()), [])
+
+        for feature in layer.getFeatures():
+            error_value = feature.attributes()[error_field_index]
+            symbol.setSize(error_value * scale_factor)
+            category = QgsRendererCategory(error_value, symbol.clone(), str(error_value))
+            renderer.addCategory(category)
+
+        layer.setRenderer(renderer)
+        layer.triggerRepaint()
       
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -254,6 +268,12 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         # Configurando o estilo da camada
 
        
+        # Aplicar tamanho baseado no valor do erro na camada de saída
+        error_field_index = 2  # A coluna do erro é a segunda coluna (índice 2)
+        scale_factor = 1.0
+        output_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
+        self.apply_error_based_size(output_layer, error_field_index, scale_factor)
+
         return {self.OUTPUT_LAYER: dest_id}
         
         # Configurando o estilo da camada
