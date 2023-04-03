@@ -58,11 +58,13 @@ from qgis.core import (QgsProcessing,
                        QgsFeature,
                        QgsField,
                        QgsRaster,
+                       QgsMarkerSymbol,
+                       QgsCategorizedSymbolRenderer,
+                       QgsRendererCategory,
+                       QgsSymbol,
                        QgsProcessingParameterFeatureSink
                     )
 
-# Importações adicionais
-from qgis.core import QgsSymbol, QgsRendererCategory, QgsCategorizedSymbolRenderer, QgsMarkerSymbol
 
 class Projeto1Solucao(QgsProcessingAlgorithm):
     """
