@@ -277,7 +277,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         self.apply_error_based_size(output_layer, error_field_index, scale_factor)
 
         return {self.OUTPUT_LAYER: dest_id}
-        
-        # Configurando o estilo da camada
+    
 
  
