@@ -103,9 +103,15 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
         layers = self.parameterAsLayerList(parameters, self.INPUT_LAYERS, context)
 
         # Codigo para processo das camadas
+        # os bounding box dos Inputs serao guardados em uma lista
         list = []
         project = QgsProject.instance()
-        for layer in layers:
+        
+        """
+        Parte 1: Criando bounding boxes dos rasters 
+        """
+
+        for layer in layers: # Percorrendo todos inputs e pegando os seus bounding boxes
             rect = layer.extent()
 
             polygon_geom = QgsGeometry.fromPolygonXY([[QgsPointXY(rect.xMinimum(),  rect.yMinimum()),
@@ -117,6 +123,7 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
             new_layer = QgsVectorLayer("Polygon",f"{layer.name()}_BBox",'memory')
             new_layer.setCrs(layer.crs())
 
+            #Criando um campo de atributo chamado 'raster' que vai guardar o raster input de origem na feição da bounding box
             fields = QgsFields()
             fields.append(QgsField('raster',QVariant.String))
 
@@ -132,12 +139,19 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
             new_layer.updateFields()
             list.append(new_layer)
 
-        list2 = list.copy()
+        """
+        Parte 2: Criação das camadas de interseções entre os bounding boxes 
+        """
+
+        list2 = list.copy() #copia da lista dos bounding boxes
+        # as interseções dos bounding boxes serão guardadas em uma terceira lista
         list3 = []
         project = QgsProject().instance()
-        for layer1 in list:
+        for layer1 in list: # percorrendo todos os bounding boxes da primeira lista
+            # removemos a layer1 da lista2 que será percorrida pelo segundo raster de forma a eliminar interseções
             list2.remove(layer1)
             for layer2 in list2:
+                # rodamos o processing intersection para pegar as interseções entre as feições
                 result = processing.run("qgis:intersection", {
                 'INPUT': layer1,
                 'OVERLAY': layer2,
@@ -145,9 +159,16 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
                })
                 intersect_layer = result['OUTPUT']
                 if not intersect_layer.featureCount()==0:
-                    list3.append(intersect_layer)
+                    list3.append(intersect_layer) # guardamos as interseções das feições em uma lista 3 
 
+        """
+        Parte 3: Criação do grid de pontos espaçados 
+        """
+
+        # Os outputs serão guardados em uma lista results
         result = []
+        
+        # Para cada camada na lista 3, criamos um grid de pontos espaçados 200m em x e y na extensão dessa camada
         for layer in list3:
             extent = layer.extent()
 
@@ -162,7 +183,12 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
 
             result.append(resultado['OUTPUT'])
 
-        layer_cnt = 0
+
+        """
+        Parte 4: Calculo do erro, gerando as camadas com os outputs desejados, agrupando em um grupo os outputs e adicionando no projeto
+        """
+
+        # para cada camada na lista 3, percorre-se as feições adicionando o campo de atributos 'Eqz' com o erro calculado no final do algoritmo
         for intersect in list3:
             new_field = QgsField('Eqz',QVariant.Double)
             intersect_provider = intersect.dataProvider()
@@ -170,8 +196,8 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
             intersect.updateFields()
             erro = 0
             counter = 0
-            layer_cnt = layer_cnt + 1
             intersect.startEditing()
+            # para cada feição da camada da lista 3, comparamos os valores dos rasters no mesmo x e y do grid anterior e armazenamos o resultado em erro e depois adicionamos o eqm no campo eqz da feição 
             for feat in intersect.getFeatures():
                 raster1 = project.mapLayersByName(feat.attributes()[0])[0]
                 raster2 = project.mapLayersByName(feat.attributes()[1])[0]
@@ -193,11 +219,12 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
                 intersect.updateFeature(feat)
             intersect.commitChanges()
             temp = intersect
-            
+            # mudamos o nome da camada para os rasters em que elas foram comparados dois a dois
             temp.setName(f"{feat.attributes()[0]}_{feat.attributes()[1]}")
             layer_tree_layer = project.addMapLayer(temp, False)
-            output_group.addLayer(temp)
-        
+            
+            # adicionamos a camada no projeto 
+            output_group.addLayer(temp) 
         # The current implementation does not process layers and will return an empty layer.
         
         # Create an empty memory layer as output
