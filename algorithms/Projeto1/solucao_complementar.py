@@ -39,6 +39,10 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterFeatureSink)
 
+from qgis.core import (QgsProcessingAlgorithm, QgsProcessingParameterMultipleLayers, QgsProcessingParameterFeatureSink, QgsProcessing, QgsVectorLayer, QgsProject, QgsGeometry, QgsPointXY, QgsField, QgsFields, QgsFeature, QgsCoordinateReferenceSystem, QgsRaster)
+from qgis.analysis import QgsNativeAlgorithms
+from PyQt5.QtCore import QVariant
+import processing
 
 class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
     """
@@ -58,69 +62,140 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
+    INPUT_LAYERS = 'INPUT_LAYERS'
     OUTPUT = 'OUTPUT'
-    INPUT = 'INPUT'
 
     def initAlgorithm(self, config):
-        """
-        Here we define the inputs and output of the algorithm, along
-        with some other properties.
-        """
-
-        # We add the input vector features source. It can have any kind of
-        # geometry.
+        # Adicione os parâmetros do CalculateIntersectionBbox
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT,
-                self.tr('Input layer'),
-                [QgsProcessing.TypeVectorAnyGeometry]
+            QgsProcessingParameterMultipleLayers(
+                self.INPUT_LAYERS,
+                self.tr('Input Raster Layers'),
+                QgsProcessing.TypeRaster
             )
         )
 
-        # We add a feature sink in which to store our processed features (this
-        # usually takes the form of a newly created vector layer when the
-        # algorithm is run in QGIS).
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Output layer')
+                self.tr('Output Layer')
             )
         )
 
     def processAlgorithm(self, parameters, context, feedback):
-        """
-        Here is where the processing itself takes place.
-        """
+        # criando a saida agrupada
+        group_name = "Saida Agrupada"
+        layer_tree_root = QgsProject.instance().layerTreeRoot()
+        output_group = layer_tree_root.findGroup(group_name)
+        if output_group is None:
+            output_group = layer_tree_root.addGroup(group_name)
 
-        # Retrieve the feature source and sink. The 'dest_id' variable is used
-        # to uniquely identify the feature sink, and must be included in the
-        # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(parameters, self.INPUT, context)
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                context, source.fields(), source.wkbType(), source.sourceCrs())
+        layers = self.parameterAsLayerList(parameters, self.INPUT_LAYERS, context)
 
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
-        total = 100.0 / source.featureCount() if source.featureCount() else 0
-        features = source.getFeatures()
+        # Código de processamento de layers aqui (o mesmo que no CalculateIntersectionBbox)
+        # Your code for processing layers should be placed here.
+        list = []
+        project = QgsProject.instance()
+        for layer in layers:
+            rect = layer.extent()
 
-        for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
-            if feedback.isCanceled():
-                break
+            polygon_geom = QgsGeometry.fromPolygonXY([[QgsPointXY(rect.xMinimum(),  rect.yMinimum()),
+                                                        QgsPointXY(rect.xMinimum(), rect.yMaximum()),
+                                                        QgsPointXY(rect.xMaximum(), rect.yMaximum()),
+                                                        QgsPointXY(rect.xMaximum(), rect.yMinimum()),
+                                                        QgsPointXY(rect.xMinimum(), rect.yMinimum())]]
+                                                        )
+            new_layer = QgsVectorLayer("Polygon",f"{layer.name()}_BBox",'memory')
+            new_layer.setCrs(layer.crs())
 
-            # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
+            fields = QgsFields()
+            fields.append(QgsField('raster',QVariant.String))
 
-            # Update the progress bar
-            feedback.setProgress(int(current * total))
+            provider = new_layer.dataProvider()
+            provider.addAttributes(fields)
 
-        # Return the results of the algorithm. In this case our only result is
-        # the feature sink which contains the processed features, but some
-        # algorithms may return multiple feature sinks, calculated numeric
-        # statistics, etc. These should all be included in the returned
-        # dictionary, with keys matching the feature corresponding parameter
-        # or output names.
+            nome = layer.name()
+            feature = QgsFeature(new_layer.fields())
+            feature.setGeometry(polygon_geom)
+            feature.setAttributes([nome])
+            provider.addFeature(feature)
+
+            new_layer.updateFields()
+            list.append(new_layer)
+
+        list2 = list.copy()
+        list3 = []
+        project = QgsProject().instance()
+        for layer1 in list:
+            list2.remove(layer1)
+            for layer2 in list2:
+                result = processing.run("qgis:intersection", {
+                'INPUT': layer1,
+                'OVERLAY': layer2,
+                'OUTPUT': 'memory:'
+               })
+                intersect_layer = result['OUTPUT']
+                if not intersect_layer.featureCount()==0:
+                    list3.append(intersect_layer)
+
+        result = []
+        for layer in list3:
+            extent = layer.extent()
+
+            resultado = processing.run("native:creategrid", {'TYPE':0,
+            'EXTENT':extent,
+            'HSPACING':200,
+            'VSPACING':200,
+            'HOVERLAY':0,
+            'VOVERLAY':0,
+            'CRS':QgsCoordinateReferenceSystem('EPSG:31982'),
+            'OUTPUT':'TEMPORARY_OUTPUT'})
+
+            result.append(resultado['OUTPUT'])
+
+        layer_cnt = 0
+        for intersect in list3:
+            new_field = QgsField('Eqz',QVariant.Double)
+            intersect_provider = intersect.dataProvider()
+            intersect_provider.addAttributes([new_field])
+            intersect.updateFields()
+            erro = 0
+            counter = 0
+            layer_cnt = layer_cnt + 1
+            intersect.startEditing()
+            for feat in intersect.getFeatures():
+                raster1 = project.mapLayersByName(feat.attributes()[0])[0]
+                raster2 = project.mapLayersByName(feat.attributes()[1])[0]
+                provider1 = raster1.dataProvider()
+                provider2 = raster2.dataProvider()
+                for layer_point in result:
+                    for point_feat in layer_point.getFeatures():
+                        if intersect.extent().contains(point_feat.geometry().boundingBox()):
+                            geom = point_feat.geometry()
+                            x,y = geom.asPoint()
+                            point = QgsPointXY(x,y)
+                            pixel_value1 = provider1.identify(point,QgsRaster.IdentifyFormatValue).results()[1]
+                            pixel_value2 = provider2.identify(point,QgsRaster.IdentifyFormatValue).results()[1]
+                            erro = abs(pixel_value1 - pixel_value2)
+                            erro = erro + erro**2
+                            counter = counter + 1
+                EMQz = (erro/counter)**1/2
+                feat[2] = EMQz
+                intersect.updateFeature(feat)
+            intersect.commitChanges()
+            temp = intersect
+            
+            temp.setName(f"{feat.attributes()[0]}_{feat.attributes()[1]}")
+            layer_tree_layer = project.addMapLayer(temp, False)
+            output_group.addLayer(temp)
+        
+        # The current implementation does not process layers and will return an empty layer.
+        
+        # Create an empty memory layer as output
+        output_layer = temp
+
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context, output_layer.fields(), output_layer.wkbType(), output_layer.sourceCrs())
+
         return {self.OUTPUT: dest_id}
 
     def name(self):
@@ -162,3 +237,6 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
 
     def createInstance(self):
         return Projeto1SolucaoComplementar()
+    
+    
+    
