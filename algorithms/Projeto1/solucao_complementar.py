@@ -32,17 +32,26 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
+from qgis.utils import iface
+import processing
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.analysis import QgsNativeAlgorithms
+from PyQt5.QtCore import QVariant
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterMultipleLayers,
+                       QgsVectorLayer,
+                       QgsProject, 
+                       QgsGeometry, 
+                       QgsPointXY, 
+                       QgsField, 
+                       QgsFields, 
+                       QgsFeature, 
+                       QgsCoordinateReferenceSystem, 
+                       QgsRaster,
                        QgsProcessingParameterFeatureSink)
-
-from qgis.core import (QgsProcessingAlgorithm, QgsProcessingParameterMultipleLayers, QgsProcessingParameterFeatureSink, QgsProcessing, QgsVectorLayer, QgsProject, QgsGeometry, QgsPointXY, QgsField, QgsFields, QgsFeature, QgsCoordinateReferenceSystem, QgsRaster)
-from qgis.analysis import QgsNativeAlgorithms
-from PyQt5.QtCore import QVariant
-import processing
 
 class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
     """
@@ -83,17 +92,17 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
         )
 
     def processAlgorithm(self, parameters, context, feedback):
-        # criando a saida agrupada
-        group_name = "Saida Agrupada"
+        # Criando a saida agrupada
+        group_name = "Saída Script"
         layer_tree_root = QgsProject.instance().layerTreeRoot()
         output_group = layer_tree_root.findGroup(group_name)
         if output_group is None:
-            output_group = layer_tree_root.addGroup(group_name)
+            output_group = layer_tree_root.insertGroup(0, group_name)  # Insere o grupo na primeira posição
+
 
         layers = self.parameterAsLayerList(parameters, self.INPUT_LAYERS, context)
 
-        # Código de processamento de layers aqui (o mesmo que no CalculateIntersectionBbox)
-        # Your code for processing layers should be placed here.
+        # Codigo para processo das camadas
         list = []
         project = QgsProject.instance()
         for layer in layers:
@@ -194,9 +203,7 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
         # Create an empty memory layer as output
         output_layer = temp
 
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context, output_layer.fields(), output_layer.wkbType(), output_layer.sourceCrs())
-
-        return {self.OUTPUT: dest_id}
+        return {}
 
     def name(self):
         """
