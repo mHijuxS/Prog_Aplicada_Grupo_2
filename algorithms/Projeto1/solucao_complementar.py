@@ -245,7 +245,11 @@ class Projeto1SolucaoComplementar(QgsProcessingAlgorithm):
         return 'Projeto 1'
 
     def shortHelpString(self):
-        return self.tr("Esse algoritmo tem como objetivo determinar camadas de vetores do tipo polígono que possuem em seus atributos o nome da camada raster de input, o nome da camada raster que está sobreposta a ela e o erro relativo entre essas duas camadas, todas agrupadas em um grupo")
+        return self.tr("""Esse algoritmo tem como objetivo determinar camadas de vetores do tipo polígono
+                          que possuem em seus atributos o nome da camada raster de input, o nome da camada 
+                          raster que está sobreposta a ela e o erro relativo entre essas duas camadas, todas
+                          agrupadas em um grupo"""
+                       )
     
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
