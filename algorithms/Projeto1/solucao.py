@@ -67,22 +67,10 @@ from qgis.core import (QgsProcessing,
 
 
 class Projeto1Solucao(QgsProcessingAlgorithm):
+
     """
-    This is an example algorithm that takes a vector layer and
-    creates a new identical one.
-
-    It is meant to be used as an example of how to create your own
-    algorithms and explain methods and variables used to do it. An
-    algorithm like this will be available in all elements, and there
-    is not need for additional work.
-
-    All Processing algorithms should extend the QgsProcessingAlgorithm
-    class.
+    Definindo as constantes
     """
-
-    # Constants used to refer to parameters and outputs. They will be
-    # used when calling the algorithm from another algorithm, or when
-    # calling from the QGIS console.
 
     INPUT_CSV = 'INPUT_CSV'
     INPUT_RASTER = 'INPUT_RASTER'
@@ -95,37 +83,15 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         return Projeto1Solucao()
 
     def name(self):
-        """
-        Returns the algorithm name, used for identifying the algorithm. This
-        string should be fixed for the algorithm, and must not be localised.
-        The name should be unique within each provider. Names should contain
-        lowercase alphanumeric characters only and no spaces or other
-        formatting characters.
-        """
         return 'Solução do Projeto 1'
 
     def displayName(self):
-        """
-        Returns the translated algorithm name, which should be used for any
-        user-visible display of the algorithm name.
-        """
         return self.tr(self.name())
 
     def group(self):        
-        """
-        Returns the name of the group this algorithm belongs to. This string
-        should be localised.
-        """
         return self.tr(self.groupId())
 
     def groupId(self):
-        """
-        Returns the unique ID of the group this algorithm belongs to. This
-        string should be fixed for the algorithm, and must not be localised.
-        The group id should be unique within each provider. Group id should
-        contain lowercase alphanumeric characters only and no spaces or other
-        formatting characters.
-        """
         return 'Projeto 1'
         
     def shortHelpString(self):
@@ -139,11 +105,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
     
     
     def initAlgorithm(self, config=None):
-        """
-        Here we define the inputs and output of the algorithm, along
-        with some other properties.
-        """
-
         self.addParameter(QgsProcessingParameterFile(
             self.INPUT_CSV,
             'Input CSV file',
@@ -160,6 +121,9 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         ))
 
 
+    """
+    Função que muda a simbologia da camada baseada no valor do erro 
+    """
     def apply_error_based_size(self, layer, error_field_index, scale_factor=1.0):
         symbol = QgsMarkerSymbol.createSimple({})
         renderer = QgsCategorizedSymbolRenderer('{}'.format(layer.fields()[error_field_index].name()), [])
@@ -174,32 +138,25 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         layer.triggerRepaint()
       
     def processAlgorithm(self, parameters, context, feedback):
-        """
-        Here is where the processing itself takes place.
-        """
-
-        # Retrieve the feature source and sink. The 'dest_id' variable is used
-        # to uniquely identify the feature sink, and must be included in the
-        # dictionary returned by the processAlgorithm function.
-       # Get input parameters
+        # Pegando os parametros de input
         input_csv = self.parameterAsString(parameters, self.INPUT_CSV, context)
         input_raster = self.parameterAsRasterLayer(parameters,self.INPUT_RASTER, context)
 
-        #Convert CSV to Shapefile
+        # Convertendo o CSV para um shapefile
         df = pd.read_csv(input_csv)
         gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y, df.z))
         gdf.to_file('pontos_de_controle.shp', driver='ESRI Shapefile')
 
-        #Load Shapefile into QGIS
+        # Carregar o shapefile no Qgis
         layer_points_control = QgsVectorLayer('pontos_de_controle.shp', 'points', 'ogr')
         if not layer_points_control.isValid():
             raise Exception('Failed to load input layer')
 
-        # Get the coordinate systems of the layers
+        # Pegar as coordenadas de referencia das camadas
         raster_crs = input_raster.crs()
         point_crs = layer_points_control.crs()
 
-        # Create a new point layer with the same CRS as the point layer
+        # Criar uma nova camada do tipo ponto com a mesma CRS da camada raster
         fields = QgsFields()
         fields.append(QgsField('x', QVariant.Double))
         fields.append(QgsField('y', QVariant.Double))
@@ -213,14 +170,14 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
                             raster_crs
         )
 
-        # get the data provider for the layer
         provider = input_raster.dataProvider()
         
         
         EMQ = 0
         counter = 0
         
-        # Write the filtered points to the new layer
+
+        # percorre todas as feições da camada de pontos de controle e calcula o valor do raster nos pontos (x,y) do ponto de controle e calcula o erro entre o z da camada do ponto de controle
         for feat in layer_points_control.getFeatures():
             if input_raster.extent().contains(feat.geometry().boundingBox()):
                 geom = feat.geometry()
@@ -260,15 +217,9 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
             feedback.pushInfo("Não conforme")
             
         
-        # Return the results of the algorithm. In this case our only result is
-        # the feature sink which contains the processed features, but some
-        # algorithms may return multiple feature sinks, calculated numeric
-        # statistics, etc. These should all be included in the returned
-        # dictionary, with keys matching the feature corresponding parameter
-        # or output names.
-        
-        # Configurando o estilo da camada
-
+        """
+        Define o estilo da camada de saida
+        """
        
         # Aplicar tamanho baseado no valor do erro na camada de saída
         error_field_index = 2  # A coluna do erro é a segunda coluna (índice 2)
