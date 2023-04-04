@@ -96,7 +96,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         
     def shortHelpString(self):
         return self.tr("""Esse algoritmo tem como objetivo determinar a acurácia 
-                          absoluta de 6 modelos de superfície. Criando uma camada 
+                          absoluta de um modelos de superfície. Criando uma camada 
                           temporária com atributo erro, o qual contém o vlaor de 
                           e_z. Além disso, as camadas são carregadas de modo que 
                           sua simbologia permita analisar espacialmente a distri-
