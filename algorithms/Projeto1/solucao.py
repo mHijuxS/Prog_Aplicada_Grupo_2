@@ -154,7 +154,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
         # Pegar as coordenadas de referencia das camadas
         raster_crs = input_raster.crs()
-        point_crs = layer_points_control.crs()
 
         # Criar uma nova camada do tipo ponto com a mesma CRS da camada raster
         fields = QgsFields()
