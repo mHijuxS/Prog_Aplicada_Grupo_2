@@ -64,7 +64,9 @@ from qgis.core import (QgsProcessing,
                        QgsSymbol,
                        QgsProcessingParameterFeatureSink
                     )
-class Projeto1Solucao(QgsProcessingAlgorithm):
+
+
+class Projeto2Solucao(QgsProcessingAlgorithm):
 
     """
     Definindo as constantes
@@ -78,10 +80,10 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         return QCoreApplication.translate('Processando', string)
 
     def createInstance(self):
-        return Projeto1Solucao()
+        return Projeto2Solucao()
 
     def name(self):
-        return 'Solução do Projeto 1'
+        return 'Solução do Projeto 2'
 
     def displayName(self):
         return self.tr(self.name())
@@ -90,7 +92,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         return self.tr(self.groupId())
 
     def groupId(self):
-        return 'Projeto 1'
+        return 'Projeto 2'
         
     def shortHelpString(self):
         return self.tr("""Esse algoritmo tem como objetivo determinar a acurácia 
@@ -225,3 +227,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         self.apply_error_based_size(output_layer, error_field_index, scale_factor)
 
         return {self.OUTPUT_LAYER: dest_id}
+    
+
+ 

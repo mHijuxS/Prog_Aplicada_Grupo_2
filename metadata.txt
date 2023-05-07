@@ -8,7 +8,9 @@ qgisMinimumVersion=3.22
 description=Solução do Grupo 2
 version=0.11
 author=Grupo 2
-email=borba.philipe@ime.eb.br
+email=matheus.ferreira@ime.eb.br
+	leonardo.fernandes@ime.eb.br
+	daniel.nojima@ime.eb.br
 
 about=Soluções dos projetos de programação aplicada do grupo 2
 
