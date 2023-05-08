@@ -98,7 +98,7 @@ class Projeto2SolucaoComplementar(QgsProcessingAlgorithm):
         source_polygon = self.parameterAsSource(parameters, self.INPUT_POLYGON, context)
 
         fields = source_multiline.fields()
-        fields.append(QgsField('inside', QVariant.Bool))
+        fields.append(QgsField('dentro_de_poligono', QVariant.Bool))
 
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
                                                fields, source_multiline.wkbType(),
