@@ -71,166 +71,59 @@ class Projeto2SolucaoComplementar(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    INPUT_LAYERS = 'INPUT_LAYERS'
+    INPUT_MULTILINE = 'INPUT_MULTILINE'
+    INPUT_POLYGON = 'INPUT_POLYGON'
     OUTPUT = 'OUTPUT'
 
-    def initAlgorithm(self, config):
-        # Adicione os parâmetros do CalculateIntersectionBbox
+    def initAlgorithm(self, config=None):
         self.addParameter(
-            QgsProcessingParameterMultipleLayers(
-                self.INPUT_LAYERS,
-                self.tr('Input Raster Layers'),
-                QgsProcessing.TypeRaster
-            )
-        )
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_MULTILINE,
+                'Input multiline layer',
+                [QgsProcessing.TypeVectorLine]))
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_POLYGON,
+                'Input polygon layer',
+                [QgsProcessing.TypeVectorPolygon]))
 
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Output Layer')
-            )
-        )
+                'Output multiline layer'))
 
     def processAlgorithm(self, parameters, context, feedback):
-        # Criando a saida agrupada
-        group_name = "Saída Script"
-        layer_tree_root = QgsProject.instance().layerTreeRoot()
-        output_group = layer_tree_root.findGroup(group_name)
-        if output_group is None:
-            output_group = layer_tree_root.insertGroup(0, group_name)  # Insere o grupo na primeira posição
+        source_multiline = self.parameterAsSource(parameters, self.INPUT_MULTILINE, context)
+        source_polygon = self.parameterAsSource(parameters, self.INPUT_POLYGON, context)
 
+        fields = source_multiline.fields()
+        fields.append(QgsField('dentro_de_poligono', QVariant.Bool))
 
-        layers = self.parameterAsLayerList(parameters, self.INPUT_LAYERS, context)
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               fields, source_multiline.wkbType(),
+                                               source_multiline.sourceCrs())
 
-        # Codigo para processo das camadas
-        # os bounding box dos Inputs serao guardados em uma lista
-        list = []
-        project = QgsProject.instance()
-        
-        """
-        Parte 1: Criando bounding boxes dos rasters 
-        """
+        total_features = source_multiline.featureCount()
+        processed_features = 0
 
-        for layer in layers: # Percorrendo todos inputs e pegando os seus bounding boxes
-            rect = layer.extent()
+        for ml_feature in source_multiline.getFeatures():
+            geom_ml = ml_feature.geometry()
 
-            polygon_geom = QgsGeometry.fromPolygonXY([[QgsPointXY(rect.xMinimum(),  rect.yMinimum()),
-                                                        QgsPointXY(rect.xMinimum(), rect.yMaximum()),
-                                                        QgsPointXY(rect.xMaximum(), rect.yMaximum()),
-                                                        QgsPointXY(rect.xMaximum(), rect.yMinimum()),
-                                                        QgsPointXY(rect.xMinimum(), rect.yMinimum())]]
-                                                        )
-            new_layer = QgsVectorLayer("Polygon",f"{layer.name()}_BBox",'memory')
-            new_layer.setCrs(layer.crs())
+            inside = False
+            for polygon_feature in source_polygon.getFeatures():
+                geom_polygon = polygon_feature.geometry()
+                if geom_ml.within(geom_polygon):
+                    inside = True
+                    break
 
-            #Criando um campo de atributo chamado 'raster' que vai guardar o raster input de origem na feição da bounding box
-            fields = QgsFields()
-            fields.append(QgsField('raster',QVariant.String))
+            ml_feature.setAttributes(ml_feature.attributes() + [inside])
+            sink.addFeature(ml_feature)
 
-            provider = new_layer.dataProvider()
-            provider.addAttributes(fields)
+            processed_features += 1
+            feedback.setProgress(100.0 * processed_features / total_features)
 
-            nome = layer.name()
-            feature = QgsFeature(new_layer.fields())
-            feature.setGeometry(polygon_geom)
-            feature.setAttributes([nome])
-            provider.addFeature(feature)
-
-            new_layer.updateFields()
-            list.append(new_layer)
-
-        """
-        Parte 2: Criação das camadas de interseções entre os bounding boxes 
-        """
-
-        list2 = list.copy() #copia da lista dos bounding boxes
-        # as interseções dos bounding boxes serão guardadas em uma terceira lista
-        list3 = []
-        project = QgsProject().instance()
-        for layer1 in list: # percorrendo todos os bounding boxes da primeira lista
-            # removemos a layer1 da lista2 que será percorrida pelo segundo raster de forma a eliminar interseções
-            list2.remove(layer1)
-            for layer2 in list2:
-                # rodamos o processing intersection para pegar as interseções entre as feições
-                result = processing.run("qgis:intersection", {
-                'INPUT': layer1,
-                'OVERLAY': layer2,
-                'OUTPUT': 'memory:'
-               })
-                intersect_layer = result['OUTPUT']
-                if not intersect_layer.featureCount()==0:
-                    list3.append(intersect_layer) # guardamos as interseções das feições em uma lista 3 
-
-        """
-        Parte 3: Criação do grid de pontos espaçados 
-        """
-
-        # Os outputs serão guardados em uma lista results
-        result = []
-        
-        # Para cada camada na lista 3, criamos um grid de pontos espaçados 200m em x e y na extensão dessa camada
-        for layer in list3:
-            extent = layer.extent()
-
-            resultado = processing.run("native:creategrid", {'TYPE':0,
-            'EXTENT':extent,
-            'HSPACING':200,
-            'VSPACING':200,
-            'HOVERLAY':0,
-            'VOVERLAY':0,
-            'CRS':QgsCoordinateReferenceSystem('EPSG:31982'),
-            'OUTPUT':'TEMPORARY_OUTPUT'})
-
-            result.append(resultado['OUTPUT'])
-
-
-        """
-        Parte 4: Calculo do erro, gerando as camadas com os outputs desejados, agrupando em um grupo os outputs e adicionando no projeto
-        """
-
-        # para cada camada na lista 3, percorre-se as feições adicionando o campo de atributos 'Eqz' com o erro calculado no final do algoritmo
-        for intersect in list3:
-            new_field = QgsField('Eqz',QVariant.Double)
-            intersect_provider = intersect.dataProvider()
-            intersect_provider.addAttributes([new_field])
-            intersect.updateFields()
-            erro = 0
-            counter = 0
-            intersect.startEditing()
-            # para cada feição da camada da lista 3, comparamos os valores dos rasters no mesmo x e y do grid anterior e armazenamos o resultado em erro e depois adicionamos o eqm no campo eqz da feição 
-            for feat in intersect.getFeatures():
-                raster1 = project.mapLayersByName(feat.attributes()[0])[0]
-                raster2 = project.mapLayersByName(feat.attributes()[1])[0]
-                provider1 = raster1.dataProvider()
-                provider2 = raster2.dataProvider()
-                for layer_point in result:
-                    for point_feat in layer_point.getFeatures():
-                        if intersect.extent().contains(point_feat.geometry().boundingBox()):
-                            geom = point_feat.geometry()
-                            x,y = geom.asPoint()
-                            point = QgsPointXY(x,y)
-                            pixel_value1 = provider1.identify(point,QgsRaster.IdentifyFormatValue).results()[1]
-                            pixel_value2 = provider2.identify(point,QgsRaster.IdentifyFormatValue).results()[1]
-                            erro = abs(pixel_value1 - pixel_value2)
-                            erro = erro + erro**2
-                            counter = counter + 1
-                EMQz = (erro/counter)**1/2
-                feat[2] = EMQz
-                intersect.updateFeature(feat)
-            intersect.commitChanges()
-            temp = intersect
-            # mudamos o nome da camada para os rasters em que elas foram comparados dois a dois
-            temp.setName(f"{feat.attributes()[0]}_{feat.attributes()[1]}")
-            layer_tree_layer = project.addMapLayer(temp, False)
-            
-            # adicionamos a camada no projeto 
-            output_group.addLayer(temp) 
-        # The current implementation does not process layers and will return an empty layer.
-        
-        # Create an empty memory layer as output
-        output_layer = temp
-
-        return {}
+        return {self.OUTPUT: dest_id}
 
     def name(self):
         return 'Solução Complementar do Projeto 2'

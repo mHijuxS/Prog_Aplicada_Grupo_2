@@ -149,7 +149,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     def processAlgorithm(self, parameters, context, feedback):
 
 
-        return {self.OUTPUT_LAYER: dest_id}
+    return {self.OUTPUT_LAYER: dest_id}
     
 
  
