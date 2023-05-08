@@ -191,8 +191,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 sink.addFeature(new_feat)
                 EMQ = EMQ + erro**2
                 counter = counter + 1
-        EMQ = (EMQ/counter)**1/2
-        
+        EMQ = (EMQ/counter)**1/2 
         feedback.pushInfo(f"EMQ = {EMQ}")
 
         A_EP = 1.67
