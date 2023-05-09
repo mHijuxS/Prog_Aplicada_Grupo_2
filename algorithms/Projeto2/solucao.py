@@ -196,7 +196,15 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ######################################### ITEM 1 ##############################################    
    ###############################################################################################
 
-
+        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
+            if multiStepFeedback.isCanceled():
+                break
+            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
+            if errorMsg != '':
+                flag = QgsFeature(fields)
+                flag.setGeometry(QgsGeometry.fromWkt(point))
+                flag["Motivo"] = errorMsg
+                sink_point.addFeature(flag)
 
    ###############################################################################################
    ###################################### ITEM 2 e 3 #############################################    
@@ -296,6 +304,24 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     FUNÇÕES AUXILIARES
 
     """  
+    def errorWhenCheckingInAndOut(self, inAndOutCounters):
+        incoming = inAndOutCounters["incoming"]
+        outgoing = inAndOutCounters["outgoing"]
+        total = incoming + outgoing
+
+        if total == 1:
+            return ''
+        if total >= 4:
+            return '4 or more lines conected to this point.'
+        
+        if (incoming == 0):
+            return 'There are lines coming from this point, but not lines going in.'
+
+        if (outgoing == 0):
+            return 'There are lines going into this point, but not lines coming from it.'
+
+        return ''
+    
     def find_canals_connected_to_drains(self,canals_layer, drains_layer, feedback):
         # Verifica se as camadas são válidas:
         if not canals_layer.isValid() or not drains_layer.isValid():
