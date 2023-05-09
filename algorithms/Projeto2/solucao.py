@@ -47,6 +47,7 @@ from qgis.core import (QgsProcessing,
                        QgsVectorLayer,
                        QgsFeatureSink,
                        QgsExpression,
+                       QgsSpatialIndex,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterFile,
@@ -126,6 +127,28 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                         self.INPUT_CANAL,
                                         context)
         
+        #Separating Water Bodies with and without flux of water
+        # Defining the Water Body with flow and without flow
+        ## Without Flow
+        water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 0')
+        water_body_no_flow.setSubsetString(filter.expression())
+
+        ## With Flow 
+        water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 1')
+        water_body_with_flow.setSubsetString(filter.expression())
+        
+        #Applying the same logic for the Sink and Spill Points
+        sink_points = QgsVectorLayer(sink_spills_points.source(), 'sink_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 1')
+        sink_points.setSubsetString(filter.expression())
+
+        spill_points = QgsVectorLayer(sink_spills_points.source(), 'spill_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 2')
+        spill_points.setSubsetString(filter.expression())
+
+
         # Outputs terão um campo de atributo explicando a razão da flag
         fields = QgsFields()
         fields.append(QgsField("Motivo", QVariant.String))
@@ -136,14 +159,16 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                                            context,
                                                            fields,
                                                            QgsWkbTypes.Point,
-                                                           drains.sourceCrs())
+                                                           drains.sourceCrs()
+                                                           )
         
         (sink_line, dest_id_line) = self.parameterAsSink(parameters,
                                                          self.LINEFLAGS,
                                                          context,
                                                          fields,
                                                          QgsWkbTypes.LineString,
-                                                         drains.sourceCrs()) 
+                                                         drains.sourceCrs()
+                                                         ) 
 
         (sink_polygon, dest_id_polygon) = self.parameterAsSink(parameters,
                                                                self.POLYGONFLAGS,
@@ -187,65 +212,56 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             multiStepFeedback.setProgress(current * stepSize)
         
         multiStepFeedback.setCurrentStep(1)
-        stepSize = 100/len(pointInAndOutDictionary)
-
+                
    ###############################################################################################
    ######################################### ITEM 1 ##############################################    
    ###############################################################################################
-        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
-            if multiStepFeedback.isCanceled():
-                break
-            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
-            if errorMsg != '':
-                flag = QgsFeature(fields)
-                flag.setGeometry(QgsGeometry.fromWkt(point))
-                flag["Motivo"] = errorMsg
-                sink_point.addFeature(flag)
+
+
 
    ###############################################################################################
    ###################################### ITEM 2 e 3 #############################################    
    ###############################################################################################
 
-    #Iterando sobre o dicionario e vendo se algum dos pontos do tipo sumidouro estão no caso em que
-    #"Incoming = 0" e "Outgoing = 1"
-        for point in sink_spills_points.getFeatures():
-            sink_type = point.attributes()[4]
-            if sink_type != 1:
-                continue
-            for (point_wkt,in_out) in pointInAndOutDictionary.items():
-                if (in_out["incoming"] ==0 and in_out["outgoing"] == 1):
-                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flag = QgsFeature(fields)
-                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flag["Motivo"] = "Não pode ser um Sumidouro"
-                        sink_point.addFeature(flag)
-    #Mesma Lógica para "Incoming=1" e "Outgoing = 0"
-        for point in sink_spills_points.getFeatures():
-            sink_type = point.attributes()[4]
-            if sink_type != 2:
-                continue
-            for (point_wkt,in_out) in pointInAndOutDictionary.items():
-                if (in_out["incoming"] ==1 and in_out["outgoing"] == 0):
-                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flag = QgsFeature(fields)
-                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flag["Motivo"] = "Não pode ser um Vertedouro"
-                        sink_point.addFeature(flag)
+        
 
+   ###############################################################################################
    #################################### ITEM 4, 5 e 6 ############################################    
    ###############################################################################################
-        #Separando as massas dagua em Oceano, Bacia
+
    ###############################################################################################
    ######################################### ITEM 7 ##############################################    
    ###############################################################################################
 
-   ###############################################################################################
-   ######################################### ITEM 8 ##############################################    
-   ###############################################################################################      
+        if canals is None:
+            pass
+        else:
+            # Lista responsável por adicionar os índices dos canais que possuem conexão com as drenagens:
+            idCanalsDrain = []
+            
+            # Dicionário que adiciona as feições do canal que serão analisadas e seu índice espacial:
+            dictCanals = {}
+            canalSpatialIndex = QgsSpatialIndex()
+            
+            for i in canals.getFeatures():
+                dictCanals[i.id()] = i
+                canalSpatialIndex.addFeature(i)
 
-        return {self.POINTFLAGS: dest_id_point,
-                self.LINEFLAGS: dest_id_line,
-                self.POLYGONFLAGS: dest_id_polygon} 
+            total = total / drains.featureCount()
+
+            for current, drFeat in enumerate(drains.getFeatures()):
+                
+                drGeom = drFeat.geometry()
+                bboxDrain = drGeom.boundingBox()
+                for idCanals in canalSpatialIndex.intersects(bboxDrain):
+                    if drGeom.equals(dictCanals[idCanals].geometry()):
+                        idCanalsDrain.append(idCanals)
+                multiStepFeedback.setProgress(int(current * total))
+            multiStepFeedback.setCurrentStep(8)
+        
+   ##############################################################################################
+   ######################################## ITEM 8 ##############################################    
+   ###############################################################################################      
         
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -272,23 +288,5 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     """ 
 
     FUNÇÕES AUXILIARES
-    """
-    
-    def errorWhenCheckingInAndOut(self, inAndOutCounters):
-        incoming = inAndOutCounters["incoming"]
-        outgoing = inAndOutCounters["outgoing"]
-        total = incoming + outgoing
 
-        if total == 1:
-            return ''
-        if total >= 4:
-            return '4 or more lines conected to this point.'
-        
-        if (incoming == 0):
-            return 'There are lines coming from this point, but not lines going in.'
-
-        if (outgoing == 0):
-            return 'There are lines going into this point, but not lines coming from it.'
-
-        return ''
-
+    """  
