@@ -127,27 +127,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                         self.INPUT_CANAL,
                                         context)
         
-        #Separating Water Bodies with and without flux of water
-        # Defining the Water Body with flow and without flow
-        ## Without Flow
-        water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
-        filter = QgsExpression('possuitrechodrenagem = 0')
-        water_body_no_flow.setSubsetString(filter.expression())
-
-        ## With Flow 
-        water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
-        filter = QgsExpression('possuitrechodrenagem = 1')
-        water_body_with_flow.setSubsetString(filter.expression())
-        
-        #Applying the same logic for the Sink and Spill Points
-        sink_points = QgsVectorLayer(sink_spills_points.source(), 'sink_points', sink_spills_points.providerType())
-        filter = QgsExpression('tiposumvert = 1')
-        sink_points.setSubsetString(filter.expression())
-
-        spill_points = QgsVectorLayer(sink_spills_points.source(), 'spill_points', sink_spills_points.providerType())
-        filter = QgsExpression('tiposumvert = 2')
-        spill_points.setSubsetString(filter.expression())
-
 
         # Outputs terão um campo de atributo explicando a razão da flag
         fields = QgsFields()
