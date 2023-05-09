@@ -209,9 +209,18 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             multiStepFeedback.setProgress(current * stepSize)
         
         multiStepFeedback.setCurrentStep(1)
-                
+        stepSize = 100/len(pointInAndOutDictionary)
         #######ALGORITMO 1#######
-        
+
+        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
+            if multiStepFeedback.isCanceled():
+                break
+            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
+            if errorMsg != '':
+                flagFeature = QgsFeature(fields)
+                flagFeature.setGeometry(QgsGeometry.fromWkt(point))
+                flagFeature["Motivo"] = errorMsg
+                sink_point.addFeature(flagFeature)
         
         
     def tr(self, string):
@@ -241,3 +250,21 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     FUNÇÕES AUXILIARES
 
     """  
+    
+    def errorWhenCheckingInAndOut(self, inAndOutCounters):
+        incoming = inAndOutCounters["incoming"]
+        outgoing = inAndOutCounters["outgoing"]
+        total = incoming + outgoing
+
+        if total == 1:
+            return ''
+        if total >= 4:
+            return '4 or more lines conected to this point.'
+        
+        if (incoming == 0):
+            return 'There are lines coming from this point, but not lines going in.'
+
+        if (outgoing == 0):
+            return 'There are lines going into this point, but not lines coming from it.'
+
+        return ''
