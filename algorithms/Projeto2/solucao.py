@@ -244,7 +244,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ######################################### ITEM 7 ##############################################    
    ###############################################################################################
 
-        self.find_canals_connected_to_drains(canals, drains, feedback) 
 
    ##############################################################################################
    ######################################## ITEM 8 ##############################################    
@@ -322,38 +321,3 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
 
         return ''
     
-    def find_canals_connected_to_drains(self,canals_layer, drains_layer, feedback):
-        # Verifica se as camadas são válidas:
-        if not canals_layer.isValid() or not drains_layer.isValid():
-            raise ValueError("Camadas inválidas")
-
-        # Cria um dicionário para armazenar os índices espaciais dos canais e suas geometrias:
-        canal_geometries = {}
-        canal_spatial_index = QgsSpatialIndex()
-
-        for canal_feat in canals_layer.getFeatures():
-            canal_geom = canal_feat.geometry()
-            canal_geometries[canal_feat.id()] = canal_geom
-            canal_spatial_index.addFeature(canal_feat)
-
-        # Inicializa uma lista para armazenar os índices dos canais conectados às drenagens:
-        connected_canal_ids = []
-
-        # Itera sobre as feições das drenagens:
-        for drain_feat in drains_layer.getFeatures():
-            drain_geom = drain_feat.geometry()
-            bbox_drain = drain_geom.boundingBox()
-
-            # Itera sobre os índices espaciais dos canais que intersectam a bounding box da drenagem:
-            for canal_id in canal_spatial_index.intersects(bbox_drain):
-                canal_geom = canal_geometries[canal_id]
-
-                # Verifica se a geometria do canal é igual à geometria da drenagem:
-                if drain_geom.equals(canal_geom):
-                    connected_canal_ids.append(canal_id)
-
-            # Atualiza o feedback de progresso:
-            feedback.setProgressText(f"Processando drenagem {drain_feat.id()}")
-            feedback.setProgress(int(drain_feat.id() / drains_layer.featureCount() * 100))
-
-        return connected_canal_ids
