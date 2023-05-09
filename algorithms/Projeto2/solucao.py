@@ -148,9 +148,11 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         spill_points.setSubsetString(filter.expression())
 
 
-                
+        # Outputs terão um campo de atributo explicando a razão da flag
+        fields = QgsFields()
+        fields.append(QgsField("Motivo", QVariant.String))
 
-        # Setting the flags for output
+        # Configurando os Outputs 
         (sink_point, dest_id_point) = self.parameterAsSink(parameters,
                                                            self.POINTFLAGS,
                                                            context,
