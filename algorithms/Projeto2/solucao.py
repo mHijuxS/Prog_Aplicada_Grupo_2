@@ -179,7 +179,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         
 
         ####################
-        # Calculando a estrutura das linhas
+        # Calculando a estrutura das linhas e criando o dicionário que vai armazenar a quantidade de linhas que entram ou saem de um determinado ponto
         pointInAndOutDictionary = {}
 
         lineCount = drains.featureCount()
