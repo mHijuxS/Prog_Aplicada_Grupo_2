@@ -39,6 +39,7 @@ from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProject,
+                       QgsWkbTypes,
                        QgsProcessingUtils,
                        QgsVectorLayer,
                        QgsFeatureSink,
@@ -105,6 +106,56 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         return self.tr("""ESCREVER AQUI"""
                        )
     
+    """
+    Funções Auxiliares
+    """
+
+    """DSG TOOLS VALIDATION ALGORITHMS"""
+    def prepareFlagSink(self, parameters, source, wkbType, context):
+        (self.flagSink, self.flag_id) = self.prepareAndReturnFlagSink(
+            parameters,
+            source,
+            wkbType,
+            context,
+            self.FLAGS
+            )
+    
+    def prepareAndReturnFlagSink(self, parameters, source, wkbType, context, UI_FIELD):
+        flagFields = self.getFlagFields()
+        (flagSink, flag_id) = self.parameterAsSink(
+            parameters,
+            UI_FIELD,
+            context,
+            flagFields,
+            wkbType,
+            source.sourceCrs() if source is not None else QgsProject.instance().crs()
+        )
+        if flagSink is None:
+            raise QgsProcessingException(self.invalidSinkError(parameters, UI_FIELD))
+        return (flagSink, flag_id)
+
+    def getFlagFields(self):
+        fields = QgsFields()
+        fields.append(QgsField('reason',QVariant.String))
+        return fields
+    
+    def flagFeature(self, flagGeom, flagText, fromWkb=False, sink=None):
+        """
+        Creates and adds to flagSink a new flag with the reason.
+        :param flagGeom: (QgsGeometry) geometry of the flag;
+        :param flagText: (string) Text of the flag
+        """
+        flagSink = self.flagSink if sink is None else sink
+        newFeat = QgsFeature(self.getFlagFields())
+        newFeat['reason'] = flagText
+        if fromWkb:
+            geom = QgsGeometry()
+            geom.fromWkb(flagGeom)
+            newFeat.setGeometry(geom)
+        else:
+            newFeat.setGeometry(flagGeom)
+        flagSink.addFeature(newFeat, QgsFeatureSink.FastInsert)
+    """"""
     
     def initAlgorithm(self, config=None):
 
@@ -158,14 +209,46 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                              context)
         
         #Separating Water Bodies with and without flux of water
-        # Definindo os camadas d'agua com ou sem fluxo
-        ## Sem fluxo
+        # Defining the Water Body with flow and without flow
+        ## Without Flow
         water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
         filter = QgsExpression('possuitrechodrenagem = 0')
         water_body_no_flow.setSubsetString(filter.expression())
 
-        ## Com fluxo
+        ## With Flow 
         water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
         filter = QgsExpression('possuitrechodrenagem = 1')
         water_body_with_flow.setSubsetString(filter.expression())
+        
+        #Applying the same logic for the Sink and Spill Points
+        sink_points = QgsVectorLayer(sink_spills_points.source(), 'sink_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 1')
+        sink_points.setSubsetString(filter.expression())
+
+        spill_points = QgsVectorLayer(sink_spills_points.source(), 'spill_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 2')
+        spill_points.setSubsetString(filter.expression())
+
+        #Applying the same logic for the Ocean=3, Bay=4 and Cove=5
+        #filter = QgsExpression('tipomassadagua = ')
+
+        # Setting the flags for output
+        (self.pointFlagSink, self.point_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                                 drains,
+                                                                                 QgsWkbTypes.Point,
+                                                                                 context,
+                                                                                 self.POINTFLAGS
+        )
+        (self.lineFlagSink, self.line_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                               drains,
+                                                                               QgsWkbTypes.LineString,
+                                                                               context,
+                                                                               self.LINEFLAGS
+        )
+        (self.polygonFlagSink, self.polygon_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                                     drains,
+                                                                                     QgsWkbTypes.Polygon,
+                                                                                     context,
+                                                                                     self.POLYGONFLAGS)
+        
         
