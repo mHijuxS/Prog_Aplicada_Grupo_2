@@ -203,8 +203,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 sink_point.addFeature(flag)
         
         
-        
-        
                 
 
 
