@@ -126,28 +126,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                         self.INPUT_CANAL,
                                         context)
         
-        #Separating Water Bodies with and without flux of water
-        # Defining the Water Body with flow and without flow
-        ## Without Flow
-        water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
-        filter = QgsExpression('possuitrechodrenagem = 0')
-        water_body_no_flow.setSubsetString(filter.expression())
-
-        ## With Flow 
-        water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
-        filter = QgsExpression('possuitrechodrenagem = 1')
-        water_body_with_flow.setSubsetString(filter.expression())
-        
-        #Applying the same logic for the Sink and Spill Points
-        sink_points = QgsVectorLayer(sink_spills_points.source(), 'sink_points', sink_spills_points.providerType())
-        filter = QgsExpression('tiposumvert = 1')
-        sink_points.setSubsetString(filter.expression())
-
-        spill_points = QgsVectorLayer(sink_spills_points.source(), 'spill_points', sink_spills_points.providerType())
-        filter = QgsExpression('tiposumvert = 2')
-        spill_points.setSubsetString(filter.expression())
-
-
         # Outputs terão um campo de atributo explicando a razão da flag
         fields = QgsFields()
         fields.append(QgsField("Motivo", QVariant.String))
@@ -222,6 +200,13 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 flagFeature["Motivo"] = errorMsg
                 sink_point.addFeature(flagFeature)
         
+        
+        
+        
+        
+        return {self.POINTFLAGS: dest_id_point,
+                self.LINEFLAGS: dest_id_line,
+                self.POLYGONFLAGS: dest_id_polygon} 
                 
    ###############################################################################################
    ######################################### ITEM 1 ##############################################    
@@ -233,48 +218,48 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###################################### ITEM 2 e 3 #############################################    
    ###############################################################################################
 
-        if vs is None:
-            pass
-        else:
+        # if vs is None:
+        #     pass
+        # else:
             
-            total = total / vs.featureCount()
+        #     total = total / vs.featureCount()
 
-            for current, (ponto, qtdEntramSaem) in enumerate(dictEntramSaem.items()):
-                # Caso o usuário deseje cancelar o processo
-                if multiStepFeedback.isCanceled():
-                    break
-                featurePonto = QgsFeature()
-                featurePonto.setGeometry(QgsGeometry.fromWkt(ponto))
-                # Iterando na camada dos vertedouros e sumidouros:
-                for current2, pontoVorS in enumerate(vs.getFeatures()):
-                    # Analisando o caso do número de linhas saindo é 1 e o número de entrada é 0 e corresponde
-                    # a um sumidouro
+        #     for current, (ponto, qtdEntramSaem) in enumerate(dictEntramSaem.items()):
+        #         # Caso o usuário deseje cancelar o processo
+        #         if multiStepFeedback.isCanceled():
+        #             break
+        #         featurePonto = QgsFeature()
+        #         featurePonto.setGeometry(QgsGeometry.fromWkt(ponto))
+        #         # Iterando na camada dos vertedouros e sumidouros:
+        #         for current2, pontoVorS in enumerate(vs.getFeatures()):
+        #             # Analisando o caso do número de linhas saindo é 1 e o número de entrada é 0 e corresponde
+        #             # a um sumidouro
                     
-                    # Verificando se o ponto de sumidouro ou vertedouro está dentro da feição do ponto da iteração
-                    if featurePonto.geometry().within(pontoVorS.geometry()) == False:
-                        continue
-                    if (qtdEntramSaem["chegando"] == 0 and qtdEntramSaem["saindo"] == 1 and pontoVorS["tiposumvert"] == 1):
-                        flagFeature = QgsFeature(fields)
-                        flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
-                        flagFeature["motivo_da_flag"] = "Não pode ser um Sumidouro"
-                        # Adicionando na camada de saída a flag encontrada, temos:
-                        sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
-                    # Analisando o caso do número de linhas saindo é 0 e o número de entrada é 1 e corresponde
-                    # a um vertedouro
-                    elif (qtdEntramSaem["chegando"] == 1 and qtdEntramSaem["saindo"] == 0 and pontoVorS["tiposumvert"] == 2):
-                        flagFeature = QgsFeature(fields)
-                        flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
-                        flagFeature["motivo_da_flag"] = "Não pode ser um Vertedouro"
-                        # Adicionando na camada de saída a flag encontrada, temos:
-                        sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+        #             # Verificando se o ponto de sumidouro ou vertedouro está dentro da feição do ponto da iteração
+        #             if featurePonto.geometry().within(pontoVorS.geometry()) == False:
+        #                 continue
+        #             if (qtdEntramSaem["chegando"] == 0 and qtdEntramSaem["saindo"] == 1 and pontoVorS["tiposumvert"] == 1):
+        #                 flagFeature = QgsFeature(fields)
+        #                 flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
+        #                 flagFeature["motivo_da_flag"] = "Não pode ser um Sumidouro"
+        #                 # Adicionando na camada de saída a flag encontrada, temos:
+        #                 sink_point.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+        #             # Analisando o caso do número de linhas saindo é 0 e o número de entrada é 1 e corresponde
+        #             # a um vertedouro
+        #             elif (qtdEntramSaem["chegando"] == 1 and qtdEntramSaem["saindo"] == 0 and pontoVorS["tiposumvert"] == 2):
+        #                 flagFeature = QgsFeature(fields)
+        #                 flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
+        #                 flagFeature["motivo_da_flag"] = "Não pode ser um Vertedouro"
+        #                 # Adicionando na camada de saída a flag encontrada, temos:
+        #                 sink_point.addFeature(flagFeature, QgsFeatureSink.FastInsert)
                     
-                    multiStepFeedback.setProgress(int(current2 * total))
+        #             multiStepFeedback.setProgress(int(current2 * total))
             
-                multiStepFeedback.setCurrentStep(3)
+        #         multiStepFeedback.setCurrentStep(3)
 
-                multiStepFeedback.setProgress(int(current * total))
+        #         multiStepFeedback.setProgress(int(current * total))
 
-            multiStepFeedback.setCurrentStep(4)
+        #     multiStepFeedback.setCurrentStep(4)
 
    ###############################################################################################
    #################################### ITEM 4, 5 e 6 ############################################    
@@ -313,7 +298,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     """ 
 
     FUNÇÕES AUXILIARES
-
+    """
     
     def errorWhenCheckingInAndOut(self, inAndOutCounters):
         incoming = inAndOutCounters["incoming"]
@@ -332,3 +317,4 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             return 'There are lines going into this point, but not lines coming from it.'
 
         return ''
+
