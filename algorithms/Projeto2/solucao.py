@@ -75,7 +75,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     """
     
     # INPUTS 
-    INPUT_DRENAGENS = 'INPUT_DRENAGENS'
+    INPUT_DRAINAGES = 'INPUT_DRAINAGES'
     INPUT_SINK_SPILL = 'INPUT_SINK_SPILL'
     INPUT_WATER_BODY = 'INPUT_WATER_BODY'
     INPUT_DITCH = 'INPUT_DITCH'
@@ -111,7 +111,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     def initAlgorithm(self, config):
 
         # Camadas de Entrada.
-        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_DRENAGENS, 
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_DRAINAGES, 
                                                             'Drenagens',
                                                             types=[QgsProcessing.TypeVectorLine], 
                                                             defaultValue=None))
@@ -149,7 +149,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     def processAlgorithm(self, parameters, context, feedback):
 
 
-    return {self.OUTPUT_LAYER: dest_id}
+        return {}
     
 
  
