@@ -210,32 +210,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###################################### ITEM 2 e 3 #############################################    
    ###############################################################################################
 
-    #Iterando sobre o dicionario e vendo se algum dos pontos do tipo sumidouro estão no caso em que
-    #"Incoming = 0" e "Outgoing = 1"
-        for point in sink_spills_points.getFeatures():
-            sink_type = point.attributes()[4]
-            if sink_type != 1:
-                continue
-            for (point_wkt,in_out) in pointInAndOutDictionary.items():
-                if (in_out["incoming"] ==0 and in_out["outgoing"] == 1):
-                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flag = QgsFeature(fields)
-                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flag["Motivo"] = "Não pode ser um Sumidouro"
-                        sink_point.addFeature(flag)
-    #Mesma Lógica para "Incoming=1" e "Outgoing = 0"
-        for point in sink_spills_points.getFeatures():
-            sink_type = point.attributes()[4]
-            if sink_type != 2:
-                continue
-            for (point_wkt,in_out) in pointInAndOutDictionary.items():
-                if (in_out["incoming"] ==1 and in_out["outgoing"] == 0):
-                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flag = QgsFeature(fields)
-                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flag["Motivo"] = "Não pode ser um Vertedouro"
-                        sink_point.addFeature(flag)
-
    # TO DO
    #################################### ITEM 4 ############################################    
    ###############################################################################################
@@ -248,28 +222,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ##############################################################################################
    ######################################## ITEM 8 ##############################################    
    ###############################################################################################      
-        #Todos os vertedouros e sumidouros deveriam estar no dicionário de pontos que entram e saem drenagens
-        #Portanto, basta verificar se estão ou não 
-        
-        attributesError = 0
-        for ponto in sink_spills_points.getFeatures():
-            pontoGeometry = ponto.geometry()
-            nome = ponto.attributes()[1]
-            noError = False
-            for line in drains.getFeatures():
-                lineGeometry = line.geometry()
-                for part in lineGeometry.parts():
-                    vertices = list(part)
-                    for i in range(len(vertices)-1):
-                        point = QgsGeometry.fromPointXY(QgsPointXY(vertices[i].x(), vertices[i].y()))
-                        if pontoGeometry.intersects(point): noError = True
-            if noError:
-                feedback.pushInfo(f"O sumidouro/vertedouro {nome} está isolado.")
-                flag = QgsFeature(fields)
-                flag.setGeometry(QgsGeometry.asPoint(point))
-                flag["Motivo"] = "O sumidouro/vertedouro está isolado"
-                sink_point.addFeature(flag)
-                attributesError += 1
 
                     
         return {self.POINTFLAGS: dest_id_point,
@@ -314,10 +266,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             return '4 or more lines conected to this point.'
         
         if (incoming == 0):
-            return 'There are lines coming from this point, but not lines going in.'
+            return 'Existem linhas saindo desse ponto, mas não tem linhas entrando'
 
         if (outgoing == 0):
-            return 'There are lines going into this point, but not lines coming from it.'
+            return 'Existem linhas entrando nesse ponto, mas não tem linhas saindo dele'
 
         return ''
     
