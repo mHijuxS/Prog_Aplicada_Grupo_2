@@ -178,8 +178,8 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         
         
 
-        ####################
-        # Calculando a estrutura das linhas e criando o dicionário que vai armazenar a quantidade de linhas que entram ou saem de um determinado ponto
+        
+        # Calculando a estrutura das linhas
         pointInAndOutDictionary = {}
 
         lineCount = drains.featureCount()
@@ -222,6 +222,71 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 flagFeature["Motivo"] = errorMsg
                 sink_point.addFeature(flagFeature)
         
+                
+   ###############################################################################################
+   ######################################### ITEM 1 ##############################################    
+   ###############################################################################################
+
+
+
+   ###############################################################################################
+   ###################################### ITEM 2 e 3 #############################################    
+   ###############################################################################################
+
+        if vs is None:
+            pass
+        else:
+            
+            total = total / vs.featureCount()
+
+            for current, (ponto, qtdEntramSaem) in enumerate(dictEntramSaem.items()):
+                # Caso o usuário deseje cancelar o processo
+                if multiStepFeedback.isCanceled():
+                    break
+                featurePonto = QgsFeature()
+                featurePonto.setGeometry(QgsGeometry.fromWkt(ponto))
+                # Iterando na camada dos vertedouros e sumidouros:
+                for current2, pontoVorS in enumerate(vs.getFeatures()):
+                    # Analisando o caso do número de linhas saindo é 1 e o número de entrada é 0 e corresponde
+                    # a um sumidouro
+                    
+                    # Verificando se o ponto de sumidouro ou vertedouro está dentro da feição do ponto da iteração
+                    if featurePonto.geometry().within(pontoVorS.geometry()) == False:
+                        continue
+                    if (qtdEntramSaem["chegando"] == 0 and qtdEntramSaem["saindo"] == 1 and pontoVorS["tiposumvert"] == 1):
+                        flagFeature = QgsFeature(fields)
+                        flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
+                        flagFeature["motivo_da_flag"] = "Não pode ser um Sumidouro"
+                        # Adicionando na camada de saída a flag encontrada, temos:
+                        sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+                    # Analisando o caso do número de linhas saindo é 0 e o número de entrada é 1 e corresponde
+                    # a um vertedouro
+                    elif (qtdEntramSaem["chegando"] == 1 and qtdEntramSaem["saindo"] == 0 and pontoVorS["tiposumvert"] == 2):
+                        flagFeature = QgsFeature(fields)
+                        flagFeature.setGeometry(QgsGeometry.fromWkt(pontoVorS.geometry().asWkt()))
+                        flagFeature["motivo_da_flag"] = "Não pode ser um Vertedouro"
+                        # Adicionando na camada de saída a flag encontrada, temos:
+                        sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+                    
+                    multiStepFeedback.setProgress(int(current2 * total))
+            
+                multiStepFeedback.setCurrentStep(3)
+
+                multiStepFeedback.setProgress(int(current * total))
+
+            multiStepFeedback.setCurrentStep(4)
+
+   ###############################################################################################
+   #################################### ITEM 4, 5 e 6 ############################################    
+   ###############################################################################################
+
+   ###############################################################################################
+   ######################################### ITEM 7 ##############################################    
+   ###############################################################################################
+
+   ###############################################################################################
+   ######################################### ITEM 8 ##############################################    
+   ###############################################################################################      
         
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -249,7 +314,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
 
     FUNÇÕES AUXILIARES
 
-    """  
     
     def errorWhenCheckingInAndOut(self, inAndOutCounters):
         incoming = inAndOutCounters["incoming"]
