@@ -232,9 +232,18 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                         flag["Motivo"] = "Não pode ser um Vertedouro"
                         sink_point.addFeature(flag)
 
-   #################################### ITEM 4, 5 e 6 ############################################    
+   # TO DO
+   #################################### ITEM 4 ############################################    
    ###############################################################################################
-        #Separando as massas dagua em Oceano, Bacia
+                        
+   ############################### ITEM 5 ####################################### 
+
+                        
+                     
+                        
+                        
+                        
+
    ###############################################################################################
    ######################################### ITEM 7 ##############################################    
    ###############################################################################################
@@ -242,7 +251,30 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###############################################################################################
    ######################################### ITEM 8 ##############################################    
    ###############################################################################################      
+        #Todos os vertedouros e sumidouros deveriam estar no dicionário de pontos que entram e saem drenagens
+        #Portanto, basta verificar se estão ou não 
+        
+        attributesError = 0
+        for ponto in sink_spills_points.getFeatures():
+            pontoGeometry = ponto.geometry()
+            nome = ponto.attributes()[1]
+            noError = False
+            for line in drains.getFeatures():
+                lineGeometry = line.geometry()
+                for part in lineGeometry.parts():
+                    vertices = list(part)
+                    for i in range(len(vertices)-1):
+                        point = QgsGeometry.fromPointXY(QgsPointXY(vertices[i].x(), vertices[i].y()))
+                        if pontoGeometry.intersects(point): noError = True
+            if noError:
+                feedback.pushInfo(f"O sumidouro/vertedouro {nome} está isolado.")
+                flag = QgsFeature(fields)
+                flag.setGeometry(QgsGeometry.asPoint(point))
+                flag["Motivo"] = "O sumidouro/vertedouro está isolado"
+                sink_point.addFeature(flag)
+                attributesError += 1
 
+                    
         return {self.POINTFLAGS: dest_id_point,
                 self.LINEFLAGS: dest_id_line,
                 self.POLYGONFLAGS: dest_id_polygon} 
