@@ -37,21 +37,22 @@ import processing
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.analysis import QgsNativeAlgorithms
 from PyQt5.QtCore import QVariant
-from qgis.core import (QgsProcessing,
-                       QgsFeatureSink,
-                       QgsProcessingAlgorithm,
-                       QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterMultipleLayers,
-                       QgsVectorLayer,
-                       QgsProject, 
-                       QgsGeometry, 
-                       QgsPointXY, 
-                       QgsField, 
-                       QgsFields, 
-                       QgsFeature, 
-                       QgsCoordinateReferenceSystem, 
-                       QgsRaster,
-                       QgsProcessingParameterFeatureSink)
+from qgis.core import (QgsCoordinateReferenceSystem,
+                        QgsFeature,
+                        QgsFeatureSink,
+                        QgsFields,
+                        QgsGeometry,
+                        QgsPointXY,
+                        QgsProcessing,
+                        QgsProcessingAlgorithm,
+                        QgsProcessingParameterFeatureSink,
+                        QgsProcessingParameterFeatureSource,
+                        QgsProcessingParameterMultipleLayers,
+                        QgsProject,
+                        QgsRaster,
+                        QgsVectorLayer,
+                        QgsField)
+
 
 class Projeto2SolucaoComplementar(QgsProcessingAlgorithm):
     """

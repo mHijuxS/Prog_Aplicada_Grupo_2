@@ -73,7 +73,11 @@ from qgis.core import (QgsProcessing,
 class Projeto2Solucao(QgsProcessingAlgorithm):
 
     """
-    Definindo as constantes
+    O objetivo deste projeto é realizar uma análise das redes de drenagem, verificando a existência 
+    de possíveis erros, tais como drenagens com fluxo incorreto, início de drenagens em sumidouros, 
+    término em vertedouros, início no oceano, massas d'água com ou sem fluxo e com ou sem drenagem 
+    interna, canais e linhas sem drenagem coincidente. Além disso, pretende-se relacionar os vertedouros 
+    e sumidouros com as drenagens correspondentes.
     """
     
     # INPUTS 
