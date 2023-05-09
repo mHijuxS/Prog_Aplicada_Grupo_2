@@ -201,13 +201,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 flag.setGeometry(QgsGeometry.fromWkt(point))
                 flag["Motivo"] = errorMsg
                 sink_point.addFeature(flag)
-        
-        
-        
-        
-                
-
-
 
    ###############################################################################################
    ###################################### ITEM 2 e 3 #############################################    
@@ -238,11 +231,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                         flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
                         flag["Motivo"] = "Não pode ser um Vertedouro"
                         sink_point.addFeature(flag)
-                    
-                
-
-    
-
 
    #################################### ITEM 4, 5 e 6 ############################################    
    ###############################################################################################
