@@ -167,7 +167,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                                             'Sumidouros e Vertedouros', 
                                                              types=[QgsProcessing.TypeVectorPoint]))
         self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_CANAL, 
-                                                            'Canais', 
+                                                            'canals', 
                                                              types=[QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_WATER_BODY, 
                                                             'Massa de Agua', 
@@ -251,4 +251,26 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                                                                      context,
                                                                                      self.POLYGONFLAGS)
         
+        ################################################################################################
+        ########################################## ITEM 1 ##############################################
+        ################################################################################################
+
+         # For que irá retornar os pontos para o primeiro problema, erro de fluxo de drenagem.
+
+        total = total / len(list(dictEntramSaem.keys()))
+
+        for current, (ponto, qtdEntramSaem) in enumerate(dictEntramSaem.items()):
+            if multiStepFeedback.isCanceled():
+                break
+            msgErro = self.erroQtdEntramSaem(qtdEntramSaem)
+            if msgErro != '' and ((qtdEntramSaem["saindo"] != 1 and qtdEntramSaem["saindo"] != 0) or 
+                                  (qtdEntramSaem["chegando"] != 1 and qtdEntramSaem["chegando"] != 0)):
+                flagFeature = QgsFeature(fields)
+                flagFeature.setGeometry(QgsGeometry.fromWkt(ponto))
+                flagFeature["motivo_da_flag"] = msgErro
+                # Adicionando na camada de saída a flag encontrada, temos:
+                sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+
+            multiStepFeedback.setProgress(int(current * total))
         
+        multiStepFeedback.setCurrentStep(2)
