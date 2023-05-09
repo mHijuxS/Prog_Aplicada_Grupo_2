@@ -317,7 +317,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     FUNÇÕES AUXILIARES
 
     """  
-    def find_canals_connected_to_drains(canals_layer, drains_layer, feedback):
+    def find_canals_connected_to_drains(self,canals_layer, drains_layer, feedback):
         # Verifica se as camadas são válidas:
         if not canals_layer.isValid() or not drains_layer.isValid():
             raise ValueError("Camadas inválidas")
