@@ -32,8 +32,10 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
+import pandas as pd
+import geopandas as gpd
 
-import processing
+from qgis import processing
 from qgis.utils import iface
 from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
@@ -281,21 +283,122 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         else:
             newFeat.setGeometry(flagGeom)
         flagSink.addFeature(newFeat, QgsFeatureSink.FastInsert)
-       
-    def errorWhenCheckingInAndOut(self, inAndOutCounters):
-        incoming = inAndOutCounters["incoming"]
-        outgoing = inAndOutCounters["outgoing"]
-        total = incoming + outgoing
+    """"""
+    
+    def initAlgorithm(self, config=None):
 
-        if total == 1:
-            return ''
-        if total >= 4:
-            return '4 or more lines conected to this point.'
+        #INPUTS
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_DRAINAGES, 
+                                                            'Drenagens',
+                                                            types=[QgsProcessing.TypeVectorLine]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_SINK_SPILL, 
+                                                            'Sumidouros e Vertedouros', 
+                                                             types=[QgsProcessing.TypeVectorPoint]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_CANAL, 
+                                                            'canals', 
+                                                             types=[QgsProcessing.TypeVectorLine]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_WATER_BODY, 
+                                                            'Massa de Agua', 
+                                                            types=[QgsProcessing.TypeVectorPolygon]))
         
-        if (incoming == 0):
-            return 'There are lines coming from this point, but not lines going in.'
+        #OUTPUTS
+        self.addParameter(QgsProcessingParameterFeatureSink(self.POINTFLAGS, 'Erros pontuais', 
+                                                            type=QgsProcessing.TypeVectorPoint, 
+                                                            createByDefault=True, 
+                                                            supportsAppend=True, 
+                                                            defaultValue='TEMPORARY_OUTPUT'))
+        self.addParameter(QgsProcessingParameterFeatureSink(self.LINEFLAGS, 'Erros em linhas', 
+                                                            type=QgsProcessing.TypeVectorLine, 
+                                                            createByDefault=True, 
+                                                            supportsAppend=True, 
+                                                            defaultValue='TEMPORARY_OUTPUT'))
+        self.addParameter(QgsProcessingParameterFeatureSink(self.POLYGONFLAGS, 'Erros em polígonos', 
+                                                            type=QgsProcessing.TypeVectorPolygon, 
+                                                            createByDefault=True, 
+                                                            supportsAppend=True, 
+                                                            defaultValue='TEMPORARY_OUTPUT'))
 
-        if (outgoing == 0):
-            return 'There are lines going into this point, but not lines coming from it.'
 
-        return ''
+  
+      
+    def processAlgorithm(self, parameters, context, feedback):
+        #Store the input variables
+        drains = self.parameterAsVectorLayer(parameters,
+                                             self.INPUT_DRAINAGES,
+                                             context)
+        sink_spills_points = self.parameterAsVectorLayer(parameters,
+                                                         self.INPUT_SINK_SPILL,
+                                                         context)
+        water_body = self.parameterAsVectorLayer(parameters,
+                                                   self.INPUT_WATER_BODY,
+                                                   context)
+        canals = self.parameterAsVectorLayer(parameters,
+                                             self.INPUT_CANAL,
+                                             context)
+        
+        #Separating Water Bodies with and without flux of water
+        # Defining the Water Body with flow and without flow
+        ## Without Flow
+        water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 0')
+        water_body_no_flow.setSubsetString(filter.expression())
+
+        ## With Flow 
+        water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 1')
+        water_body_with_flow.setSubsetString(filter.expression())
+        
+        #Applying the same logic for the Sink and Spill Points
+        sink_points = QgsVectorLayer(sink_spills_points.source(), 'sink_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 1')
+        sink_points.setSubsetString(filter.expression())
+
+        spill_points = QgsVectorLayer(sink_spills_points.source(), 'spill_points', sink_spills_points.providerType())
+        filter = QgsExpression('tiposumvert = 2')
+        spill_points.setSubsetString(filter.expression())
+
+        #Applying the same logic for the Ocean=3, Bay=4 and Cove=5
+        #filter = QgsExpression('tipomassadagua = ')
+
+        # Setting the flags for output
+        (self.pointFlagSink, self.point_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                                 drains,
+                                                                                 QgsWkbTypes.Point,
+                                                                                 context,
+                                                                                 self.POINTFLAGS
+        )
+        (self.lineFlagSink, self.line_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                               drains,
+                                                                               QgsWkbTypes.LineString,
+                                                                               context,
+                                                                               self.LINEFLAGS
+        )
+        (self.polygonFlagSink, self.polygon_flag_id) = self.prepareAndReturnFlagSink(parameters,
+                                                                                     drains,
+                                                                                     QgsWkbTypes.Polygon,
+                                                                                     context,
+                                                                                     self.POLYGONFLAGS)
+        
+        ################################################################################################
+        ########################################## ITEM 1 ##############################################
+        ################################################################################################
+
+         # For que irá retornar os pontos para o primeiro problema, erro de fluxo de drenagem.
+
+        total = total / len(list(dictEntramSaem.keys()))
+
+        for current, (ponto, qtdEntramSaem) in enumerate(dictEntramSaem.items()):
+            if multiStepFeedback.isCanceled():
+                break
+            msgErro = self.erroQtdEntramSaem(qtdEntramSaem)
+            if msgErro != '' and ((qtdEntramSaem["saindo"] != 1 and qtdEntramSaem["saindo"] != 0) or 
+                                  (qtdEntramSaem["chegando"] != 1 and qtdEntramSaem["chegando"] != 0)):
+                flagFeature = QgsFeature(fields)
+                flagFeature.setGeometry(QgsGeometry.fromWkt(ponto))
+                flagFeature["motivo_da_flag"] = msgErro
+                # Adicionando na camada de saída a flag encontrada, temos:
+                sink.addFeature(flagFeature, QgsFeatureSink.FastInsert)
+
+            multiStepFeedback.setProgress(int(current * total))
+        
+        multiStepFeedback.setCurrentStep(2)
