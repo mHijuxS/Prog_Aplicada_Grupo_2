@@ -205,9 +205,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         
         
         
-        return {self.POINTFLAGS: dest_id_point,
-                self.LINEFLAGS: dest_id_line,
-                self.POLYGONFLAGS: dest_id_polygon} 
                 
 
 
@@ -215,6 +212,36 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###############################################################################################
    ###################################### ITEM 2 e 3 #############################################    
    ###############################################################################################
+
+    #Iterando sobre o dicionario e vendo se algum dos pontos do tipo sumidouro estão no caso em que
+    #"Incoming = 0" e "Outgoing = 1"
+        for point in sink_spills_points.getFeatures():
+            sink_type = point.attributes()[4]
+            if sink_type != 1:
+                continue
+            for (point_wkt,in_out) in pointInAndOutDictionary.items():
+                if (in_out["incoming"] ==0 and in_out["outgoing"] == 1):
+                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
+                        flagFeature = QgsFeature(fields)
+                        flagFeature.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
+                        flagFeature["Motivo"] = "Não pode ser um Sumidouro"
+                        sink_point.addFeature(flagFeature)
+    #Mesma Lógica para "Incoming=1" e "Outgoing = 0"
+        for point in sink_spills_points.getFeatures():
+            sink_type = point.attributes()[4]
+            if sink_type != 2:
+                continue
+            for (point_wkt,in_out) in pointInAndOutDictionary.items():
+                if (in_out["incoming"] ==1 and in_out["outgoing"] == 0):
+                    if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
+                        flagFeature = QgsFeature(fields)
+                        flagFeature.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
+                        flagFeature["Motivo"] = "Não pode ser um Vertedouro"
+                    
+                
+
+    
+
 
    #################################### ITEM 4, 5 e 6 ############################################    
    ###############################################################################################
@@ -226,6 +253,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###############################################################################################
    ######################################### ITEM 8 ##############################################    
    ###############################################################################################      
+
+        return {self.POINTFLAGS: dest_id_point,
+                self.LINEFLAGS: dest_id_line,
+                self.POLYGONFLAGS: dest_id_polygon} 
         
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
