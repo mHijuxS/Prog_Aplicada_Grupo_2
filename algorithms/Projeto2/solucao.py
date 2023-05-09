@@ -188,8 +188,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         
         multiStepFeedback.setCurrentStep(1)
         stepSize = 100/len(pointInAndOutDictionary)
-        #######ALGORITMO 1#######
 
+   ###############################################################################################
+   ######################################### ITEM 1 ##############################################    
+   ###############################################################################################
         for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
             if multiStepFeedback.isCanceled():
                 break
@@ -208,9 +210,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 self.LINEFLAGS: dest_id_line,
                 self.POLYGONFLAGS: dest_id_polygon} 
                 
-   ###############################################################################################
-   ######################################### ITEM 1 ##############################################    
-   ###############################################################################################
 
 
 
