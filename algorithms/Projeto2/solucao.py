@@ -32,8 +32,10 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
+import pandas as pd
+import geopandas as gpd
 
-import processing
+from qgis import processing
 from qgis.utils import iface
 from PyQt5.QtCore import QVariant
 from qgis.PyQt.QtCore import QCoreApplication
