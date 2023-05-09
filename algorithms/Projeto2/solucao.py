@@ -42,7 +42,9 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingUtils,
                        QgsVectorLayer,
                        QgsFeatureSink,
+                       QgsExpression,
                        QgsProcessingAlgorithm,
+                       QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterFile,
                        QgsProcessingParameterVectorLayer,
                        QgsCoordinateReferenceSystem,
@@ -73,13 +75,13 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     # INPUTS 
     INPUT_DRAINAGES = 'INPUT_DRAINAGES'
     INPUT_SINK_SPILL = 'INPUT_SINK_SPILL'
-    INPUT_WATER_BODY = 'INPUT_WATER_BODY'
-    INPUT_DITCH = 'INPUT_DITCH'
+    INPUT_WATER_BODY = 'INPUT_WATER'
+    INPUT_CANAL = 'INPUT_CANAL'
 
     # OUTPUTS
-    POINT_FLAGS = 'POINT_FLAGS'
-    LINE_FLAGS = 'LINE_FLAGS'
-    POLYGON_FLAGS = 'POLYGON_FLAGS'
+    POINTFLAGS = 'POINTFLAGS'
+    LINEFLAGS = 'LINEFLAGS'
+    POLYGONFLAGS = 'POLYGONFLAGS'
 
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -104,36 +106,34 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                        )
     
     
-    def initAlgorithm(self, config):
+    def initAlgorithm(self, config=None):
 
-        # Camadas de Entrada.
+        #INPUTS
         self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_DRAINAGES, 
                                                             'Drenagens',
-                                                            types=[QgsProcessing.TypeVectorLine], 
-                                                            defaultValue=None))
-        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_SINK_SPILL, 'Sumidouros e Vertedouros', 
-                                                            types=[QgsProcessing.TypeVectorPoint], 
-                                                            defaultValue=None))
-        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_DITCH, 'Canais', 
-                                                            types=[QgsProcessing.TypeVectorLine], 
-                                                            defaultValue=None))
-
-        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_WATER_BODY, 'Massa de Agua', 
-                                                            types=[QgsProcessing.TypeVectorPolygon], 
-                                                            defaultValue=None))
+                                                            types=[QgsProcessing.TypeVectorLine]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_SINK_SPILL, 
+                                                            'Sumidouros e Vertedouros', 
+                                                             types=[QgsProcessing.TypeVectorPoint]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_CANAL, 
+                                                            'Canais', 
+                                                             types=[QgsProcessing.TypeVectorLine]))
+        self.addParameter(QgsProcessingParameterVectorLayer(self.INPUT_WATER_BODY, 
+                                                            'Massa de Agua', 
+                                                            types=[QgsProcessing.TypeVectorPolygon]))
         
-          # Camada de Saida.
-        self.addParameter(QgsProcessingParameterFeatureSink(self.POINT_FLAGS, 'Erros pontuais', 
+        #OUTPUTS
+        self.addParameter(QgsProcessingParameterFeatureSink(self.POINTFLAGS, 'Erros pontuais', 
                                                             type=QgsProcessing.TypeVectorPoint, 
                                                             createByDefault=True, 
                                                             supportsAppend=True, 
                                                             defaultValue='TEMPORARY_OUTPUT'))
-        self.addParameter(QgsProcessingParameterFeatureSink(self.LINE_FLAGS, 'Erros em linhas', 
+        self.addParameter(QgsProcessingParameterFeatureSink(self.LINEFLAGS, 'Erros em linhas', 
                                                             type=QgsProcessing.TypeVectorLine, 
                                                             createByDefault=True, 
                                                             supportsAppend=True, 
                                                             defaultValue='TEMPORARY_OUTPUT'))
-        self.addParameter(QgsProcessingParameterFeatureSink(self.POLYGON_FLAGS, 'Erros em polígonos', 
+        self.addParameter(QgsProcessingParameterFeatureSink(self.POLYGONFLAGS, 'Erros em polígonos', 
                                                             type=QgsProcessing.TypeVectorPolygon, 
                                                             createByDefault=True, 
                                                             supportsAppend=True, 
@@ -143,13 +143,29 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
   
       
     def processAlgorithm(self, parameters, context, feedback):
-        """
-        ITEM 1: Drenagens com fluxo incorreto
-        """
-        result = processing.run("dsgtools:identifydrainageflowissues", {'INPUT':'Drenagens',
-                                                               'FLAGS':'TEMPORARY_OUTPUT'})
+        #Store the input variables
+        drains = self.parameterAsVectorLayer(parameters,
+                                             self.INPUT_DRAINAGES,
+                                             context)
+        sink_spills_points = self.parameterAsVectorLayer(parameters,
+                                                         self.INPUT_SINK_SPILL,
+                                                         context)
+        water_body = self.parameterAsVectorLayer(parameters,
+                                                   self.INPUT_WATER_BODY,
+                                                   context)
+        canals = self.parameterAsVectorLayer(parameters,
+                                             self.INPUT_CANAL,
+                                             context)
+        
+        #Separating Water Bodies with and without flux of water
+        # Definindo os camadas d'agua com ou sem fluxo
+        ## Sem fluxo
+        water_body_no_flow = QgsVectorLayer(water_body.source(), 'water_body_no_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 0')
+        water_body_no_flow.setSubsetString(filter.expression())
 
-        return {}
-    
-
- 
+        ## Com fluxo
+        water_body_with_flow = QgsVectorLayer(water_body.source(), 'water_body_with_flow', water_body.providerType())
+        filter = QgsExpression('possuitrechodrenagem = 1')
+        water_body_with_flow.setSubsetString(filter.expression())
+        
