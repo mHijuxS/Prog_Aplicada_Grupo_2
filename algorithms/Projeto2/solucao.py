@@ -32,8 +32,6 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
-
-
 import pandas as pd
 import geopandas as gpd
 
