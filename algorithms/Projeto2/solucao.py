@@ -197,10 +197,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 break
             errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
             if errorMsg != '':
-                flagFeature = QgsFeature(fields)
-                flagFeature.setGeometry(QgsGeometry.fromWkt(point))
-                flagFeature["Motivo"] = errorMsg
-                sink_point.addFeature(flagFeature)
+                flag = QgsFeature(fields)
+                flag.setGeometry(QgsGeometry.fromWkt(point))
+                flag["Motivo"] = errorMsg
+                sink_point.addFeature(flag)
         
         
         
@@ -222,10 +222,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             for (point_wkt,in_out) in pointInAndOutDictionary.items():
                 if (in_out["incoming"] ==0 and in_out["outgoing"] == 1):
                     if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flagFeature = QgsFeature(fields)
-                        flagFeature.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flagFeature["Motivo"] = "Não pode ser um Sumidouro"
-                        sink_point.addFeature(flagFeature)
+                        flag = QgsFeature(fields)
+                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
+                        flag["Motivo"] = "Não pode ser um Sumidouro"
+                        sink_point.addFeature(flag)
     #Mesma Lógica para "Incoming=1" e "Outgoing = 0"
         for point in sink_spills_points.getFeatures():
             sink_type = point.attributes()[4]
@@ -234,9 +234,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             for (point_wkt,in_out) in pointInAndOutDictionary.items():
                 if (in_out["incoming"] ==1 and in_out["outgoing"] == 0):
                     if point.geometry().equals(QgsGeometry.fromWkt(point_wkt)):
-                        flagFeature = QgsFeature(fields)
-                        flagFeature.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
-                        flagFeature["Motivo"] = "Não pode ser um Vertedouro"
+                        flag = QgsFeature(fields)
+                        flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
+                        flag["Motivo"] = "Não pode ser um Vertedouro"
+                        sink_point.addFeature(flag)
                     
                 
 
@@ -245,7 +246,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
 
    #################################### ITEM 4, 5 e 6 ############################################    
    ###############################################################################################
-
+        #Separando as massas dagua em Oceano, Bacia
    ###############################################################################################
    ######################################### ITEM 7 ##############################################    
    ###############################################################################################
