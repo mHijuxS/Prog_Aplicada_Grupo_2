@@ -205,7 +205,6 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         
         
         
-        
         return {self.POINTFLAGS: dest_id_point,
                 self.LINEFLAGS: dest_id_line,
                 self.POLYGONFLAGS: dest_id_polygon} 
