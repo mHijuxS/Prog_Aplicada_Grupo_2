@@ -47,6 +47,7 @@ from qgis.core import (QgsProcessing,
                        QgsVectorLayer,
                        QgsFeatureSink,
                        QgsExpression,
+                       QgsSpatialIndex,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterFile,
@@ -126,6 +127,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                         self.INPUT_CANAL,
                                         context)
         
+
         # Outputs terão um campo de atributo explicando a razão da flag
         fields = QgsFields()
         fields.append(QgsField("Motivo", QVariant.String))
@@ -136,14 +138,16 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                                                            context,
                                                            fields,
                                                            QgsWkbTypes.Point,
-                                                           drains.sourceCrs())
+                                                           drains.sourceCrs()
+                                                           )
         
         (sink_line, dest_id_line) = self.parameterAsSink(parameters,
                                                          self.LINEFLAGS,
                                                          context,
                                                          fields,
                                                          QgsWkbTypes.LineString,
-                                                         drains.sourceCrs()) 
+                                                         drains.sourceCrs()
+                                                         ) 
 
         (sink_polygon, dest_id_polygon) = self.parameterAsSink(parameters,
                                                                self.POLYGONFLAGS,
@@ -187,8 +191,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
             multiStepFeedback.setProgress(current * stepSize)
         
         multiStepFeedback.setCurrentStep(1)
-        stepSize = 100/len(pointInAndOutDictionary)
-
+                
    ###############################################################################################
    ######################################### ITEM 1 ##############################################    
    ###############################################################################################
@@ -201,6 +204,8 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                 flag.setGeometry(QgsGeometry.fromWkt(point))
                 flag["Motivo"] = errorMsg
                 sink_point.addFeature(flag)
+        
+        
         
         
                 
@@ -236,23 +241,44 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
                         flag.setGeometry(QgsGeometry.fromWkt(point.geometry().asWkt()))
                         flag["Motivo"] = "Não pode ser um Vertedouro"
                         sink_point.addFeature(flag)
-                    
-                
 
-    
-
-
-   #################################### ITEM 4, 5 e 6 ############################################    
+   # TO DO
+   #################################### ITEM 4 ############################################    
    ###############################################################################################
-        #Separando as massas dagua em Oceano, Bacia
+
    ###############################################################################################
    ######################################### ITEM 7 ##############################################    
    ###############################################################################################
 
-   ###############################################################################################
-   ######################################### ITEM 8 ##############################################    
-   ###############################################################################################      
+        self.find_canals_connected_to_drains(canals, drains, feedback) 
 
+   ##############################################################################################
+   ######################################## ITEM 8 ##############################################    
+   ###############################################################################################      
+        #Todos os vertedouros e sumidouros deveriam estar no dicionário de pontos que entram e saem drenagens
+        #Portanto, basta verificar se estão ou não 
+        
+        attributesError = 0
+        for ponto in sink_spills_points.getFeatures():
+            pontoGeometry = ponto.geometry()
+            nome = ponto.attributes()[1]
+            noError = False
+            for line in drains.getFeatures():
+                lineGeometry = line.geometry()
+                for part in lineGeometry.parts():
+                    vertices = list(part)
+                    for i in range(len(vertices)-1):
+                        point = QgsGeometry.fromPointXY(QgsPointXY(vertices[i].x(), vertices[i].y()))
+                        if pontoGeometry.intersects(point): noError = True
+            if noError:
+                feedback.pushInfo(f"O sumidouro/vertedouro {nome} está isolado.")
+                flag = QgsFeature(fields)
+                flag.setGeometry(QgsGeometry.asPoint(point))
+                flag["Motivo"] = "O sumidouro/vertedouro está isolado"
+                sink_point.addFeature(flag)
+                attributesError += 1
+
+                    
         return {self.POINTFLAGS: dest_id_point,
                 self.LINEFLAGS: dest_id_line,
                 self.POLYGONFLAGS: dest_id_polygon} 
@@ -282,23 +308,40 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
     """ 
 
     FUNÇÕES AUXILIARES
-    """
-    
-    def errorWhenCheckingInAndOut(self, inAndOutCounters):
-        incoming = inAndOutCounters["incoming"]
-        outgoing = inAndOutCounters["outgoing"]
-        total = incoming + outgoing
 
-        if total == 1:
-            return ''
-        if total >= 4:
-            return '4 or more lines conected to this point.'
-        
-        if (incoming == 0):
-            return 'There are lines coming from this point, but not lines going in.'
+    """  
+    def find_canals_connected_to_drains(self,canals_layer, drains_layer, feedback):
+        # Verifica se as camadas são válidas:
+        if not canals_layer.isValid() or not drains_layer.isValid():
+            raise ValueError("Camadas inválidas")
 
-        if (outgoing == 0):
-            return 'There are lines going into this point, but not lines coming from it.'
+        # Cria um dicionário para armazenar os índices espaciais dos canais e suas geometrias:
+        canal_geometries = {}
+        canal_spatial_index = QgsSpatialIndex()
 
-        return ''
+        for canal_feat in canals_layer.getFeatures():
+            canal_geom = canal_feat.geometry()
+            canal_geometries[canal_feat.id()] = canal_geom
+            canal_spatial_index.addFeature(canal_feat)
 
+        # Inicializa uma lista para armazenar os índices dos canais conectados às drenagens:
+        connected_canal_ids = []
+
+        # Itera sobre as feições das drenagens:
+        for drain_feat in drains_layer.getFeatures():
+            drain_geom = drain_feat.geometry()
+            bbox_drain = drain_geom.boundingBox()
+
+            # Itera sobre os índices espaciais dos canais que intersectam a bounding box da drenagem:
+            for canal_id in canal_spatial_index.intersects(bbox_drain):
+                canal_geom = canal_geometries[canal_id]
+
+                # Verifica se a geometria do canal é igual à geometria da drenagem:
+                if drain_geom.equals(canal_geom):
+                    connected_canal_ids.append(canal_id)
+
+            # Atualiza o feedback de progresso:
+            feedback.setProgressText(f"Processando drenagem {drain_feat.id()}")
+            feedback.setProgress(int(drain_feat.id() / drains_layer.featureCount() * 100))
+
+        return connected_canal_ids
