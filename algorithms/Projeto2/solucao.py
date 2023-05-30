@@ -195,6 +195,20 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###############################################################################################
    ######################################### ITEM 1 ##############################################    
    ###############################################################################################
+        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
+            if multiStepFeedback.isCanceled():
+                break
+            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
+            if errorMsg != '':
+                flag = QgsFeature(fields)
+                flag.setGeometry(QgsGeometry.fromWkt(point))
+                flag["Motivo"] = errorMsg
+                sink_point.addFeature(flag)
+        
+        
+        
+        
+                
 
         for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
             if multiStepFeedback.isCanceled():
@@ -211,7 +225,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
    ###############################################################################################
 
    # TO DO
-   #################################### ITEM 4 ############################################    
+   ########################################### ITEM 4 ############################################    
    ###############################################################################################
 
    ###############################################################################################

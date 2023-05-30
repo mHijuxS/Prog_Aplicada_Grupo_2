@@ -64,6 +64,8 @@ from qgis.core import (QgsProcessing,
                        QgsSymbol,
                        QgsProcessingParameterFeatureSink
                     )
+
+
 class Projeto1Solucao(QgsProcessingAlgorithm):
 
     """
@@ -134,7 +136,7 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
 
         layer.setRenderer(renderer)
         layer.triggerRepaint()
-      
+        
     def processAlgorithm(self, parameters, context, feedback):
         # Pegando os parametros de input
         input_csv = self.parameterAsString(parameters, self.INPUT_CSV, context)
@@ -225,3 +227,6 @@ class Projeto1Solucao(QgsProcessingAlgorithm):
         self.apply_error_based_size(output_layer, error_field_index, scale_factor)
 
         return {self.OUTPUT_LAYER: dest_id}
+    
+
+ 
