@@ -48,7 +48,7 @@ from qgis.core import (QgsProcessing,
                        QgsGeometryUtils)
 import processing
 
-class MoveBuildings(QgsProcessingAlgorithm):
+class Projeto3Solucao(QgsProcessingAlgorithm):
     BUILDINGS = 'BUILDINGS'
     ROADS = 'ROADS'
     DISTANCE = 'DISTANCE'
