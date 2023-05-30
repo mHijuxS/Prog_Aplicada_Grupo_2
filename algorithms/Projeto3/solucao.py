@@ -48,7 +48,25 @@ from qgis.core import (QgsProcessing,
                        QgsGeometryUtils)
 import processing
 
-class Projeto3Solucao(QgsProcessingAlgorithm):
+class MoveBuildings(QgsProcessingAlgorithm):
+    BUILDINGS = 'BUILDINGS'
+    ROADS = 'ROADS'
+    DISTANCE = 'DISTANCE'
+    OUTPUT = 'OUTPUT'
+
+    def initAlgorithm(self, config=None):
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.BUILDINGS, 'Camada de Edificações', [QgsProcessing.TypeVectorPoint]))
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.ROADS, 'Camada de Rodovias', [QgsProcessing.TypeVectorLine]))
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.DISTANCE, 'Distância de deslocamento', minValue=0, defaultValue=10))
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT, 'Edificações Deslocadas'))
 
     EDIFICACOES = 'EDIFICACOES'
     RODOVIAS = 'RODOVIAS'
