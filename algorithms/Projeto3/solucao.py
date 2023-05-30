@@ -131,27 +131,6 @@ class Projeto3Solucao(QgsProcessingAlgorithm):
             feedback.setProgress(int(current * total))
             
 
-    # def deslocamento_edif(self, novo_X,novo_Y, edific_cam, u_x, u_y ):
-    #     edif_temp = QgsGeometry.fromPointXY(QgsPointXY(novo_X, novo_Y))
-    #     buildingBuffer = edif_temp.buffer(35, 5)  # 15mm buffer
-
-    #     # Check if buildingBuffer intersects any other point in edific_cam
-    #     for building in edific_cam.getFeatures():
-    #         for buildingVertex in building.geometry().vertices():
-    #             buildingVertexPoint = QgsPoint(buildingVertex.x(), buildingVertex.y())
-    #             buildingVertexPointxy = QgsPointXY(buildingVertex.x(), buildingVertex.y())
-    #             buildingVertexGeom = QgsGeometry.fromPointXY(buildingVertexPointxy)
-    #             inter = buildingBuffer.intersects(buildingVertexGeom.buffer(0.015, -1))  # Check if the buffers intersect
-    #             while(inter):
-    #                 novo_X = novo_X * u_x  * 15
-    #                 novo_Y = novo_Y * u_y  * 15
-    #                 edif_temp = QgsGeometry.fromPointXY(QgsPointXY(novo_X, novo_Y))
-    #                 buildingBuffer = edif_temp.buffer(0.015, -1)  # 15mm buffer
-    #                 inter = buildingBuffer.intersects(buildingVertexGeom.buffer(0.015, -1))  # Check if the buffers intersect
-
-
-    #     return novo_X, novo_Y
-
               
     
     def processamentoEdif(self, vertex, rodov_cam, dist_min_rodov, max_desloc, feedback):
@@ -171,8 +150,8 @@ class Projeto3Solucao(QgsProcessingAlgorithm):
                     closestX = closestPoint.x()
                     closestY = closestPoint.y()
                     dist = np.sqrt((novo_X-closestX)**2 + (novo_Y-closestY)**2)
-                    novo_X = closestX + (dist_min_rodov/dist)*(novo_X-closestX)
-                    novo_Y = closestY + (dist_min_rodov/dist)*(novo_Y-closestY)
+                    novo_X = closestX + (dist_min_rodov)*(novo_X-closestX)/dist
+                    novo_Y = closestY + (dist_min_rodov)*(novo_Y-closestY)/dist
 
                 novo_edif = QgsGeometry.fromPointXY(QgsPointXY(novo_X,novo_Y))
                 delta = novo_edif.distance(edif_atual)
