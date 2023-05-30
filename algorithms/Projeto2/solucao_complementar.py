@@ -92,7 +92,7 @@ class Projeto2SolucaoComplementar(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                'Output multiline layer'))
+                'Solucao Complementar'))
 
     def processAlgorithm(self, parameters, context, feedback):
         source_multiline = self.parameterAsSource(parameters, self.INPUT_MULTILINE, context)
