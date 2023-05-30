@@ -101,9 +101,9 @@ class Projeto3SolucaoComplementar(QgsProcessingAlgorithm):
             closest = [QgsGeometry.collectGeometry(nearest_points).nearestPoint(building.geometry())][0]
             closest_feature = [f for f in roads.getFeatures() if f.geometry().intersects(closest.buffer(0.001, 8))][0]
             # Acha o segmento de linha mais proxima da edificação
-            a, b, c, d = closest_feature.geometry().closestSegmentWithContext(building.geometry().asPoint())
+            idx = closest_feature.geometry().closestSegmentWithContext(building.geometry().asPoint())[2]
             # Coleta o azimute da linha com vertices antes e depois do segmento mais proximo
-            azimuth = closest_feature.geometry().vertexAt(c).azimuth(closest_feature.geometry().vertexAt(c-1))
+            azimuth = closest_feature.geometry().vertexAt(idx).azimuth(closest_feature.geometry().vertexAt(idx-1))
             # Cria um mapa de atributes da id da feição, indice do atributo e o valor do azimute
             att_map[building.id()] = {fni: azimuth}
 
