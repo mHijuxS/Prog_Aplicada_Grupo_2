@@ -126,104 +126,6 @@ class Projeto3SolucaoComplementar(QgsProcessingAlgorithm):
 
         
 
-        # Descartar campos nao usados
-        alg_params = {
-            'COLUMN': ['id','nome','geometriaa','jurisdicao','administra','concession','revestimen','operaciona','situacaofi','canteirodi','nrpistas','nrfaixas','trafego','tipopavime','tipovia','sigla','codtrechor','limitevelo','trechoempe','acostament','length_otf'],
-            'INPUT': outputs['ExplodirLinhas']['OUTPUT'],
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }
-        outputs['DescartarCamposNaoUsados'] = processing.run('native:deletecolumn', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        feedback.setCurrentStep(3)
-        if feedback.isCanceled():
-            return {}
-
-        # Indices Espaciais Edificacoes
-        alg_params = {
-            'INPUT': parameters['edificacoes']
-        }
-        outputs['IndicesEspaciaisEdificacoes'] = processing.run('native:createspatialindex', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        feedback.setCurrentStep(4)
-        if feedback.isCanceled():
-            return {}
-
-        # Calculando os azimutes
-        alg_params = {
-            'FIELD_LENGTH': 10,
-            'FIELD_NAME': 'Azimute',
-            'FIELD_PRECISION': 5,
-            'FIELD_TYPE': 0,  # Decimal (double)
-            'FORMULA': 'degrees(azimuth(start_point($geometry),end_point($geometry)))',
-            'INPUT': outputs['DescartarCamposNaoUsados']['OUTPUT'],
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }
-        outputs['CalculandoOsAzimutes'] = processing.run('native:fieldcalculator', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        feedback.setCurrentStep(5)
-        if feedback.isCanceled():
-            return {}
-
-        # Unir atributos pelo mais proximo
-        alg_params = {
-            'DISCARD_NONMATCHING': False,
-            'FIELDS_TO_COPY': [''],
-            'INPUT': outputs['IndicesEspaciaisEdificacoes']['OUTPUT'],
-            'INPUT_2': outputs['CalculandoOsAzimutes']['OUTPUT'],
-            'MAX_DISTANCE': None,
-            'NEIGHBORS': 1,
-            'NON_MATCHING': None,
-            'PREFIX': '',
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }
-        outputs['UnirAtributosPeloMaisProximo'] = processing.run('native:joinbynearest', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        feedback.setCurrentStep(6)
-        if feedback.isCanceled():
-            return {}
-
-        # Alimentando a coluna rotacao
-        alg_params = {
-            'FIELD_LENGTH': 0,
-            'FIELD_NAME': 'rotacao',
-            'FIELD_PRECISION': 0,
-            'FIELD_TYPE': 0,  # Decimal (double)
-            'FORMULA': '"Azimute"',
-            'INPUT': outputs['UnirAtributosPeloMaisProximo']['OUTPUT'],
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }
-        outputs['AlimentandoAColunaRotacao'] = processing.run('native:fieldcalculator', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        feedback.setCurrentStep(7)
-        if feedback.isCanceled():
-            return {}
-
-        # Descartar campos excedentes
-        alg_params = {
-            'COLUMN': ['Azimute','n','distance','feature_x','feature_y','nearest_x','nearest_y'],
-            'INPUT': outputs['AlimentandoAColunaRotacao']['OUTPUT'],
-            'OUTPUT': parameters[self.OUTPUT]
-        }
-        outputs['DescartarCamposExcedentes'] = processing.run('native:deletecolumn', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-        results[self.OUTPUT] = outputs['DescartarCamposExcedentes']['OUTPUT']
-
-        feedback.setCurrentStep(8)
-        if feedback.isCanceled():
-            return {}
-
-        # Configurando o estilo de camada de saida
-
-        # Get the path to the plugin directory
-        plugin_dir = os.path.dirname(__file__)
-        style_file = os.path.join(plugin_dir, 'edificacoes.qml')
-
-        alg_params = {
-            'INPUT': outputs['DescartarCamposExcedentes']['OUTPUT'],
-            'STYLE': style_file
-        }
-        outputs['ConfigurandoOEstiloDeCamadaDeSaida'] = processing.run('native:setlayerstyle', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-
-        return results
 
     def name(self):
         return 'Solução Complementar do Projeto 3'
@@ -238,10 +140,8 @@ class Projeto3SolucaoComplementar(QgsProcessingAlgorithm):
         return 'Projeto 3'
 
     def shortHelpString(self):
-        return self.tr("""Esse algoritmo tem como objetivo determinar camadas de vetores do tipo polígono
-                          que possuem em seus atributos o nome da camada raster de input, o nome da camada 
-                          raster que está sobreposta a ela e o erro relativo entre essas duas camadas, todas
-                          agrupadas em um grupo"""
+        return self.tr("""
+                          """
                        )
     
     def tr(self, string):
