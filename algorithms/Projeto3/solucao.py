@@ -32,48 +32,153 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
+import numpy as np
 import os
-import processing
-
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.Qt import QVariant, QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProcessingAlgorithm,
-                       QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterMultipleLayers,
                        QgsProcessingParameterFeatureSink,
-                       QgsProcessingParameterNumber, QgsProcessingParameterVectorLayer,
-                       QgsProject,
-                       QgsField,
-                       QgsFeatureSink,
-                       QgsCoordinateReferenceSystem,
-                       QgsVectorLayer,
-                       QgsFields,
-                       QgsGeometry,
+                       QgsProcessingParameterNumber,
                        QgsPointXY,
+                       QgsPoint,
                        QgsFeature,
-                       QgsRaster)
-
+                       QgsProcessingParameterVectorLayer,
+                       QgsGeometry,
+                       QgsGeometryUtils)
+import processing
 
 class Projeto3Solucao(QgsProcessingAlgorithm):
 
+    EDIFICACOES = 'EDIFICACOES'
+    RODOVIAS = 'RODOVIAS'
+    DESLOCAMENTO_MAXIMO = 'DESLOCAMENTO_MAXIMO'
+    OUTPUT = 'OUTPUT'
+
+    def initAlgorithm(self, config=None):
+
+        self.addParameter(QgsProcessingParameterVectorLayer(self.EDIFICACOES, self.tr('Insira os edifícios'), 
+                                                            types=[QgsProcessing.TypeVectorPoint], 
+                                                            defaultValue=None))
+        
+        self.addParameter(QgsProcessingParameterVectorLayer(self.RODOVIAS, self.tr('Insira as rodovias'), 
+                                                            types=[QgsProcessing.TypeVectorLine], 
+                                                            defaultValue=None))
+                
+        self.addParameter(QgsProcessingParameterNumber(self.DESLOCAMENTO_MAXIMO,
+                                                       self.tr('Insira a distância máxima de deslocamento'),
+                                                       defaultValue=100,
+                                                       type=QgsProcessingParameterNumber.Double))
+
+        self.addParameter(QgsProcessingParameterFeatureSink(self.OUTPUT, self.tr('Edifícios generalizados'), 
+                                                            type=QgsProcessing.TypeVectorPoint, 
+                                                            createByDefault=True, 
+                                                            supportsAppend=True, 
+                                                            defaultValue='TEMPORARY_OUTPUT'))
+
     def processAlgorithm(self, parameters, context, feedback):
-        buildingsLayer, highwaysLayer, maxDisplacementDistance = self.getParameters(parameters, context)
-        output_sink, output_dest_id = self.createOutputSink(parameters, context, buildingsLayer)
-        self.processBuildings(buildingsLayer, highwaysLayer, maxDisplacementDistance, output_sink, feedback)
+
+        edific_cam = self.parameterAsVectorLayer(parameters,self.EDIFICACOES,context)
+        rodov_cam = self.parameterAsVectorLayer(parameters,self.RODOVIAS,context)
+        max_desloc = self.parameterAsDouble(parameters,self.DESLOCAMENTO_MAXIMO,context)
+
+        (output_sink,output_dest_id) = self.parameterAsSink(parameters,
+                                                            self.OUTPUT,
+                                                            context,
+                                                            edific_cam.fields(),
+                                                            1,
+                                                            edific_cam.sourceCrs())
+
+            
+        self.processamento_rodov_edif(edific_cam, rodov_cam, max_desloc, output_sink, feedback)
         self.configureOutputLayerStyle(output_dest_id, context, feedback)
         return {self.OUTPUT: output_dest_id}
+    
+    def processamento_rodov_edif(self, edific_cam, rodov_cam, max_desloc, output_sink, feedback):
+        total = 100.0 / edific_cam.featureCount() if edific_cam.featureCount() else 0
+        edificios = edific_cam.getFeatures()
+        dist_min_rodov = 32.5
+        campos_sink = edific_cam.fields()
+        for current, edificio in enumerate(edificios):
+            edif_geom = edificio.geometry()
+            for geometryParts in edif_geom.parts():
+                for vertex in geometryParts.vertices():
+                    novo_X, novo_Y = self.processamentoEdif(vertex, rodov_cam, dist_min_rodov, max_desloc, feedback)
+                    # novo_X, novo_Y = self.deslocamento_edif(novo_X,novo_Y, edific_cam,v_x,v_y)
+                    novo_edif = QgsGeometry.fromPointXY(QgsPointXY(novo_X,novo_Y))
+                    newFeature = QgsFeature(campos_sink)
+                    newFeature.setGeometry(novo_edif)
+                    output_sink.addFeature(newFeature)
+
+            feedback.setProgress(int(current * total))
+            
+
+    # def deslocamento_edif(self, novo_X,novo_Y, edific_cam, u_x, u_y ):
+    #     edif_temp = QgsGeometry.fromPointXY(QgsPointXY(novo_X, novo_Y))
+    #     buildingBuffer = edif_temp.buffer(35, 5)  # 15mm buffer
+
+    #     # Check if buildingBuffer intersects any other point in edific_cam
+    #     for building in edific_cam.getFeatures():
+    #         for buildingVertex in building.geometry().vertices():
+    #             buildingVertexPoint = QgsPoint(buildingVertex.x(), buildingVertex.y())
+    #             buildingVertexPointxy = QgsPointXY(buildingVertex.x(), buildingVertex.y())
+    #             buildingVertexGeom = QgsGeometry.fromPointXY(buildingVertexPointxy)
+    #             inter = buildingBuffer.intersects(buildingVertexGeom.buffer(0.015, -1))  # Check if the buffers intersect
+    #             while(inter):
+    #                 novo_X = novo_X * u_x  * 15
+    #                 novo_Y = novo_Y * u_y  * 15
+    #                 edif_temp = QgsGeometry.fromPointXY(QgsPointXY(novo_X, novo_Y))
+    #                 buildingBuffer = edif_temp.buffer(0.015, -1)  # 15mm buffer
+    #                 inter = buildingBuffer.intersects(buildingVertexGeom.buffer(0.015, -1))  # Check if the buffers intersect
+
+
+    #     return novo_X, novo_Y
+
+              
+    
+    def processamentoEdif(self, vertex, rodov_cam, dist_min_rodov, max_desloc, feedback):
+        novo_X = vertex.x()
+        novo_Y = vertex.y()
+        edif_atual = QgsGeometry.fromPointXY(QgsPointXY(vertex.x(),vertex.y()))
+        for rodov in rodov_cam.getFeatures():
+            rodov_geom = rodov.geometry()
+            for part in rodov_geom.parts():
+                edif_temp = QgsGeometry.fromPointXY(QgsPointXY(novo_X,novo_Y))
+                point = QgsPoint(novo_X,novo_Y)
+                distance = edif_temp.distance(rodov_geom)
+
+                # Se a distancia for menor que a minima, separar da rodovia 
+                if distance < dist_min_rodov:
+                    closestPoint = QgsGeometryUtils.closestPoint(part,point)
+                    closestX = closestPoint.x()
+                    closestY = closestPoint.y()
+                    dist = np.sqrt((novo_X-closestX)**2 + (novo_Y-closestY)**2)
+                    novo_X = closestX + (dist_min_rodov/dist)*(novo_X-closestX)
+                    novo_Y = closestY + (dist_min_rodov/dist)*(novo_Y-closestY)
+
+                novo_edif = QgsGeometry.fromPointXY(QgsPointXY(novo_X,novo_Y))
+                delta = novo_edif.distance(edif_atual)
+                
+                if delta > max_desloc:
+                    novo_X = vertex.x()
+                    novo_Y = vertex.y()
+
+                if feedback.isCanceled():
+                    break
+
+        return novo_X, novo_Y 
 
     def configureOutputLayerStyle(self, output_dest_id, context, feedback):
-        set_wd = os.path.dirname(__file__)
-        style = os.path.join(set_wd, 'edificacoes.qml')
+        atual_dir = os.path.dirname(__file__)
+        estilo = os.path.join(atual_dir, 'edificacoes.qml')
         alg_params = {
             'INPUT': output_dest_id,
-            'STYLE': style 
+            'STYLE': estilo
         }
         processing.run('native:setlayerstyle', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
 
     def name(self):
-        return 'Projeto3Solucao'
+        return 'Solução Principal'
 
     def displayName(self):
         return self.tr(self.name())
@@ -89,4 +194,3 @@ class Projeto3Solucao(QgsProcessingAlgorithm):
 
     def createInstance(self):
         return Projeto3Solucao()
-

@@ -32,70 +32,121 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
-from qgis.PyQt.Qt import QVariant, QCoreApplication
-from qgis.core import ( QgsProcessing,
-                        QgsProcessingAlgorithm,
-                        QgsProcessingMultiStepFeedback,
-                        QgsProcessingParameterVectorLayer,
-                        QgsProcessingParameterFeatureSink)
-import processing
 import os
+from qgis.utils import iface
+import processing
+from qgis.PyQt.QtCore import QCoreApplication
+from qgis.analysis import QgsNativeAlgorithms
+from PyQt5.QtCore import QVariant
+from qgis.core import ( QgsGeometry,
+                        QgsProcessing,
+                        QgsProcessingAlgorithm,
+                        QgsProcessingParameterVectorLayer,
+                        )
+
 
 class Projeto3SolucaoComplementar(QgsProcessingAlgorithm):
     """
-    Este algoritmo realiza a generalização de edifícios próximos às rodovias.
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
 
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
     """
 
     # Constants used to refer to parameters and outputs. They will be
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
-    OUTPUT = 'OUTPUT'
+
+    EDIFICACOES = 'EDIFICACOES'
+    RODOVIAS = 'RODOVIAS'
+    # OUTPUT = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
-        pass
+        self.addParameter(
+            QgsProcessingParameterVectorLayer(
+                self.EDIFICACOES,
+                'Insira Camada Edificação',
+                [QgsProcessing.TypeVectorPoint]))
 
-    def processAlgorithm(self, parameters, context, model_feedback):
-        pass
-       
+        self.addParameter(
+            QgsProcessingParameterVectorLayer(
+                self.RODOVIAS,
+                'Insira Camada de Rodovia',
+                [QgsProcessing.TypeVectorLine]))
+
+        # self.addParameter(
+        #     QgsProcessingParameterFeatureSink(
+        #         self.OUTPUT,
+        #         'Solucao Complementar'))
+
+    def processAlgorithm(self, parameters, context, feedback):
+        buildings = self.parameterAsVectorLayer(parameters, self.EDIFICACOES, context)
+        roads = self.parameterAsVectorLayer(parameters, self.RODOVIAS, context)
+
+        # Coleta o indice do atributo rotacao
+        fni = buildings.fields().indexFromName('rotacao')
+
+        att_map = {}
+
+        # Iterar sobre todos os edificios
+        for building in buildings.getFeatures():
+            # Achar a feição mais proxima da edificação no for
+            nearest_points = [f.geometry().nearestPoint(building.geometry()) for f in roads.getFeatures()]
+            closest = [QgsGeometry.collectGeometry(nearest_points).nearestPoint(building.geometry())][0]
+            closest_feature = [f for f in roads.getFeatures() if f.geometry().intersects(closest.buffer(0.001, 8))][0]
+            # Acha o segmento de linha mais proxima da edificação
+            a, b, c, d = closest_feature.geometry().closestSegmentWithContext(building.geometry().asPoint())
+            # Coleta o azimute da linha com vertices antes e depois do segmento mais proximo
+            azimuth = closest_feature.geometry().vertexAt(c).azimuth(closest_feature.geometry().vertexAt(c-1))
+            # Cria um mapa de atributes da id da feição, indice do atributo e o valor do azimute
+            att_map[building.id()] = {fni: azimuth}
+
+        # Atualiza os valores dos atributos na coluna rotacao
+        buildings.dataProvider().changeAttributeValues(att_map) 
+        
+        
+        
+        self.configureOutputLayerStyle(buildings,context,feedback)
+        return {}
+        
+    def configureOutputLayerStyle(self, output_dest_id, context, feedback):
+        atual_dir = os.path.dirname(__file__)
+        estilo = os.path.join(atual_dir, 'edificacoes.qml')
+        alg_params = {
+            'INPUT': output_dest_id,
+            'STYLE': estilo
+        }
+        processing.run('native:setlayerstyle', alg_params, context=context, feedback=feedback, is_child_algorithm=True)        
+
+        
 
     def name(self):
-        """
-        Returns the algorithm name, used for identifying the algorithm. This
-        string should be fixed for the algorithm, and must not be localised.
-        The name should be unique within each provider. Names should contain
-        lowercase alphanumeric characters only and no spaces or other
-        formatting characters.
-        """
         return 'Solução Complementar do Projeto 3'
 
     def displayName(self):
-        """
-        Returns the translated algorithm name, which should be used for any
-        user-visible display of the algorithm name.
-        """
         return self.tr(self.name())
 
     def group(self):
-        """
-        Returns the name of the group this algorithm belongs to. This string
-        should be localised.
-        """
         return self.tr(self.groupId())
 
     def groupId(self):
-        """
-        Returns the unique ID of the group this algorithm belongs to. This
-        string should be fixed for the algorithm, and must not be localised.
-        The group id should be unique within each provider. Group id should
-        contain lowercase alphanumeric characters only and no spaces or other
-        formatting characters.
-        """
         return 'Projeto 3'
 
+    def shortHelpString(self):
+        return self.tr("""Esse algoritmo tem como objetivo determinar camadas de vetores do tipo polígono
+                          que possuem em seus atributos o nome da camada raster de input, o nome da camada 
+                          raster que está sobreposta a ela e o erro relativo entre essas duas camadas, todas
+                          agrupadas em um grupo"""
+                       )
+    
     def tr(self, string):
-        return QCoreApplication.translate('Processing', string)
+        return QCoreApplication.translate('Processando', string)
 
     def createInstance(self):
         return Projeto3SolucaoComplementar()
-    
