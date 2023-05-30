@@ -71,7 +71,7 @@ from qgis.core import (QgsProcessing,
                     )
 
 
-class Projeto2Solucao(QgsProcessingAlgorithm):
+class Projeto3Solucao(QgsProcessingAlgorithm):
 
     """
     Definindo as constantes
@@ -232,10 +232,10 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         return QCoreApplication.translate('Processando', string)
 
     def createInstance(self):
-        return Projeto2Solucao()
+        return Projeto3Solucao()
 
     def name(self):
-        return 'Solução do Projeto 2'
+        return 'Solução do Projeto 3'
 
     def displayName(self):
         return self.tr(self.name())
@@ -244,7 +244,7 @@ class Projeto2Solucao(QgsProcessingAlgorithm):
         return self.tr(self.groupId())
 
     def groupId(self):
-        return 'Projeto 2'
+        return 'Projeto 3'
         
     def shortHelpString(self):
         return self.tr("""ESCREVER AQUI"""
