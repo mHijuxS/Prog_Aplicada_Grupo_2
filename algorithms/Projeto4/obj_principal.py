@@ -8,7 +8,7 @@ layer_2_path = layer_2.source()
 layer_3_path = layer_3.source()
 layer_4_path = layer_4.source()
 
-layers_paths = [layer_1_path, layer_2_path, layer_3_path, layer_4_path
+layers_paths = [layer_1_path, layer_2_path, layer_3_path, layer_4_path]
 
 bounding_layer = QgsProject.instance().mapLayersByName('VE4-Ligacao — aux_moldura_a')[0]
 
