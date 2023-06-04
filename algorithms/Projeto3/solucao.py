@@ -44,6 +44,7 @@ from qgis.core import (QgsProcessing,
                        QgsPoint,
                        QgsFeature,
                        QgsProcessingParameterVectorLayer,
+                       QgsProcessingParameterFeatureSource,
                        QgsGeometry,
                        QgsGeometryUtils)
 import processing
@@ -114,9 +115,11 @@ class Projeto3Solucao(QgsProcessingAlgorithm):
     
     def processamento_rodov_edif(self, edific_cam, rodov_cam, max_desloc, output_sink, feedback):
         total = 100.0 / edific_cam.featureCount() if edific_cam.featureCount() else 0
+        
         edificios = edific_cam.getFeatures()
         dist_min_rodov = 32.5
         campos_sink = edific_cam.fields()
+
         for current, edificio in enumerate(edificios):
             edif_geom = edificio.geometry()
             for geometryParts in edif_geom.parts():
