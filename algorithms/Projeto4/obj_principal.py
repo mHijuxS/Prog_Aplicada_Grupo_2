@@ -1,56 +1,129 @@
-layer_1 = QgsProject.instance().mapLayersByName('VE4-Ligacao — elemnat_curva_nivel_l')[0]
-layer_2 = QgsProject.instance().mapLayersByName('VE4-Ligacao — elemnat_trecho_drenagem_l')[0]
-layer_3 = QgsProject.instance().mapLayersByName('VE4-Ligacao — infra_elemento_energia_l')[0]
-layer_4 = QgsProject.instance().mapLayersByName('VE4-Ligacao — infra_via_deslocamento_l')[0]
+from qgis.core import QgsProject
 
-layer_1_path = layer_1.source()
-layer_2_path = layer_2.source()
-layer_3_path = layer_3.source()
-layer_4_path = layer_4.source()
+def create_error_points_layer():
+    error_layer = QgsVectorLayer("Point", "error_points", "memory")
+    pr = error_layer.dataProvider()
 
-layers_paths = [layer_1_path, layer_2_path, layer_3_path, layer_4_path]
+    # Adiciona o campo de descrição do erro
+    pr.addAttributes([QgsField("Erro", QVariant.String)])
 
-bounding_layer = QgsProject.instance().mapLayersByName('VE4-Ligacao — aux_moldura_a')[0]
+    error_layer.updateFields() 
+    return error_layer, pr
 
-search_distance = 0.001  
+def find_features_with_same_name(layer):
+    name_to_feature = {}
+    for feature in layer.getFeatures():
+        if feature['nome'] not in name_to_feature:
+            name_to_feature[feature['nome']] = []
+        name_to_feature[feature['nome']].append(feature)
+    return name_to_feature
 
-if not bounding_layer.isValid(): 
-    print("Camada de moldura não carregada!") 
-    exit(1) 
+def find_discontinuous_features(layer, buffer_layer, tolerance, error_layer_provider):
+    name_to_feature = find_features_with_same_name(layer)
+    errors = set()
 
-# Criar uma camada de saída
-crs = bounding_layer.crs().toWkt()
-uri = "Point?crs=" + crs + "&field=id:integer&field=error_type:string"
-error_layer = QgsVectorLayer(uri, "error_layer", "memory")
-error_provider = error_layer.dataProvider()
+    for buffer_feature in buffer_layer.getFeatures():
+        buffer_geom = buffer_feature.geometry()
 
-# Loop sobre as camadas de linha
-for path in layers_paths:
-    line_layer = QgsVectorLayer(path, "line_layer", "ogr")
-    if not line_layer.isValid(): 
-        print("Camada de linha não carregada!") 
-        continue
+        for name, features in name_to_feature.items():
+            if len(features) > 1:
+                for i in range(len(features)):
+                    end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
+                    for j in range(i + 1, len(features)):
+                        start_point_2 = features[j].geometry().asMultiPolyline()[0][0]
+                        if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+                            if end_point_1.distance(start_point_2) <= tolerance:
+                                error_pair = tuple(sorted([features[i].id(), features[j].id()]))
+                                errors.add(error_pair)
+                                
+                                # Calcula o ponto médio
+                                midpoint = QgsPointXY((end_point_1.x() + start_point_2.x()) / 2, (end_point_1.y() + start_point_2.y()) / 2)
+                                
+                                # Cria uma nova feição de erro
+                                error_feature = QgsFeature()
+                                error_feature.setGeometry(QgsGeometry.fromPointXY(midpoint))
+                                error_feature.setAttributes(["Erro de geometria desconectada"])
+                                
+                                # Adiciona a feição à camada de erros
+                                error_layer_provider.addFeature(error_feature)
+
+    return errors
+
+
+def find_features_with_different_names(layer, buffer_layer, error_layer_provider):
+    errors = set()
     
-    # Crie uma indexação espacial
-    index = QgsSpatialIndex()
-    for ft in line_layer.getFeatures():
-        index.insertFeature(ft)
+    for buffer_feature in buffer_layer.getFeatures():
+        buffer_geom = buffer_feature.geometry()
 
-    # Procure por erros de ligação
-    for feature in line_layer.getFeatures():
-        # Encontre todos os recursos que compartilham uma borda
-        candidates = index.intersects(feature.geometry().boundingBox())
-        for candidate_id in candidates:
-            candidate_feature = line_layer.getFeature(candidate_id)
+        features = [feature for feature in layer.getFeatures()]
+        for i in range(len(features) - 1):
+            end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
+            start_point_2 = features[i+1].geometry().asMultiPolyline()[0][0]
+            
+            if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+                if features[i]['name'] != features[i+1]['name']:
+                    error_pair = tuple(sorted([features[i]['fid'], features[i+1]['fid']]))
+                    errors.add(error_pair)
+                    
+                    # Cria uma nova feição de erro
+                    error_feature = QgsFeature()
+                    error_feature.setGeometry(QgsGeometry.fromPointXY(end_point_1))
+                    error_feature.setAttributes(["Erro de geometrias conectadas com conjuntos de atributos distintos."])
 
-            # As bordas dos produtos que não são compartilhadas no conjunto de dados não devem ser verificadas
-            if not candidate_feature.geometry().touches(feature.geometry()):
-                print("Erro de ligação detectado entre o produto {} e o produto {}".format(feature['ID'], candidate_feature['ID']))
+                    # Adiciona a feição à camada de erros
+                    error_layer_provider.addFeature(error_feature)
+    return errors
 
-                # Adicione o ponto de erro à camada de erro
-                error_feature = QgsFeature()
-                error_feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(feature.geometry().centroid().asPoint())))
-                error_feature.setAttributes([feature['ID'], "Erro de ligação"])
-                error_provider.addFeature(error_feature)
 
-QgsProject.instance().addMapLayer(error_layer)
+def create_buffer_layer(moldura_layer, buffer_distance):
+    buffer_layer = QgsVectorLayer("Polygon", "buffer_layer", "memory")
+    pr = buffer_layer.dataProvider()
+
+    for moldura_feature in moldura_layer.getFeatures():
+        moldura_geom = moldura_feature.geometry()
+
+        # Desconstruir a geometria do polígono em linhas individuais
+        for ring in moldura_geom.asMultiPolygon():
+            for line in ring:
+                line_geom = QgsGeometry.fromPolylineXY(line)
+
+                # Cria um buffer em torno da linha
+                buffer_geom = line_geom.buffer(buffer_distance, 5)
+
+                # Cria e adiciona a feição de buffer
+                buffer_feature = QgsFeature()
+                buffer_feature.setGeometry(buffer_geom)
+                pr.addFeature(buffer_feature)
+
+    buffer_layer.updateExtents() 
+    return buffer_layer
+
+
+
+
+project = QgsProject.instance()
+moldura_layer = project.mapLayersByName('VE4-Ligacao — aux_moldura_a')[0]
+linhas_layer = project.mapLayersByName('VE4-Ligacao — infra_elemento_energia_l')[0]
+
+tolerance = 0.0001  # Ajuste esse valor conforme necessário
+buffer_distance = 0.00002  # Distância do buffer em metros
+buffer_layer = create_buffer_layer(moldura_layer, buffer_distance)
+
+# Cria a camada de pontos de erro
+error_points_layer, error_points_provider = create_error_points_layer()
+
+print("Verificando linhas com atributos iguais e que não são contínuas espacialmente...")
+errors = find_discontinuous_features(linhas_layer, buffer_layer, tolerance, error_points_provider)
+for error_pair in errors:
+    print(f"Erro encontrado: IDs - {error_pair[0]} e {error_pair[1]}")
+
+print("Verificando linhas com nomes diferentes e que são contínuas...")
+errors = find_features_with_different_names(linhas_layer, buffer_layer,error_points_provider)
+for error_pair in errors:
+    print(f"Erro encontrado: IDs - {error_pair[0]} e {error_pair[1]}")
+
+project = QgsProject.instance()
+error_points_layer.updateExtents()
+project.addMapLayer(error_points_layer)
+
