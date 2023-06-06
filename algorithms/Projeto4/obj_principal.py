@@ -63,7 +63,7 @@ def find_features_with_different_names(layer, buffer_layer, error_layer_provider
             
             if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
                 if features[i]['name'] != features[i+1]['name']:
-                    error_pair = tuple(sorted([features[i].id(), features[i+1].id()]))
+                    error_pair = tuple(sorted([features[i]['fid'], features[i+1]['fid']]))
                     errors.add(error_pair)
                     
                     # Cria uma nova feição de erro
