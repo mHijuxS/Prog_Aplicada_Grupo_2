@@ -80,7 +80,7 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
         buffer_distance = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
 
         fields = QgsFields()
-        fields.append(QgsField('new_field2', QVariant.String))
+        fields.append(QgsField('Tipo de Erro', QVariant.String))
 
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
                                                 fields, QgsWkbTypes.Point, moldura_layer.sourceCrs())
