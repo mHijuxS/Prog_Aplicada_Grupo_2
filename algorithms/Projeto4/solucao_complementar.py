@@ -32,97 +32,151 @@ __copyright__ = '(C) 2023 by Grupo 2'
 
 __revision__ = '$Format:%H$'
 
-from qgis.utils import iface
-import processing
-from qgis.PyQt.QtCore import QCoreApplication
-from qgis.analysis import QgsNativeAlgorithms
-from PyQt5.QtCore import QVariant
-from qgis.core import (QgsCoordinateReferenceSystem,
-                        QgsFeature,
-                        QgsFeatureSink,
-                        QgsFields,
-                        QgsGeometry,
-                        QgsPointXY,
-                        QgsProcessing,
-                        QgsProcessingAlgorithm,
-                        QgsProcessingParameterFeatureSink,
-                        QgsProcessingParameterFeatureSource,
-                        QgsProcessingParameterMultipleLayers,
-                        QgsProject,
-                        QgsRaster,
-                        QgsVectorLayer,
-                        QgsField)
+from qgis.core import (QgsProcessing,
+                       QgsProcessingAlgorithm,
+                       QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterVectorLayer,
+                       QgsProcessingParameterNumber,
+                       QgsProcessingParameterFeatureSink,
+                       QgsProcessingParameterDistance,
+                       QgsFields,
+                       QgsField,
+                       QgsFeature,
+                       QgsGeometry,
+                       QgsWkbTypes,
+                       QgsProcessingFeatureSourceDefinition,
+                       QgsProcessingFeatureSource,
+                       QgsProcessingFeedback,
+                       QgsProcessingContext,
+                       QgsVectorLayer,
+                       QgsVectorFileWriter,
+                       QgsFeatureSink,
+                       QgsProcessingException)
 
+from qgis import processing
 
 class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
-    """
-    This is an example algorithm that takes a vector layer and
-    creates a new identical one.
-
-    It is meant to be used as an example of how to create your own
-    algorithms and explain methods and variables used to do it. An
-    algorithm like this will be available in all elements, and there
-    is not need for additional work.
-
-    All Processing algorithms should extend the QgsProcessingAlgorithm
-    class.
-    """
-
-    # Constants used to refer to parameters and outputs. They will be
-    # used when calling the algorithm from another algorithm, or when
-    # calling from the QGIS console.
-
-    INPUT_MULTILINE = 'INPUT_MULTILINE'
-    INPUT_POLYGON = 'INPUT_POLYGON'
+    BUILDINGS = 'BUILDINGS'
+    GRID = 'GRID'
+    DISTANCE = 'DISTANCE'
+    BUFFER_DISTANCE = 'BUFFER_DISTANCE'
     OUTPUT = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT_MULTILINE,
-                'Input multiline layer',
-                [QgsProcessing.TypeVectorLine]))
-
+            QgsProcessingParameterVectorLayer(
+                self.BUILDINGS, 'Camada de Edificações', [QgsProcessing.TypeVectorPolygon]))
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT_POLYGON,
-                'Input polygon layer',
-                [QgsProcessing.TypeVectorPolygon]))
-
+            QgsProcessingParameterVectorLayer(
+                self.GRID, 'Camada de Molduras', [QgsProcessing.TypeVectorPolygon]))
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.DISTANCE, 'Distância de deslocamento', minValue=0, defaultValue=20))
+        self.addParameter(
+            QgsProcessingParameterDistance(
+                self.BUFFER_DISTANCE,
+                'Buffer Distance',
+                defaultValue=1.0
+            )
+        )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
-                self.OUTPUT,
-                'Solucao Complementar'))
+                self.OUTPUT, 'Intersecções'))
 
     def processAlgorithm(self, parameters, context, feedback):
-        source_multiline = self.parameterAsSource(parameters, self.INPUT_MULTILINE, context)
-        source_polygon = self.parameterAsSource(parameters, self.INPUT_POLYGON, context)
+        source_buildings = self.parameterAsVectorLayer(parameters, self.BUILDINGS, context)
+        source_grid = self.parameterAsVectorLayer(parameters, self.GRID, context)
+        distance = self.parameterAsDouble(parameters, self.DISTANCE, context)
+        buffer_distance = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
 
-        fields = source_multiline.fields()
-        fields.append(QgsField('dentro_de_poligono', QVariant.Bool))
+        fix_result = processing.run('native:fixgeometries', {
+            'INPUT': source_buildings,
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
+
+        source_buildings_fixed = fix_result['OUTPUT']
+
+        buffer_result_positive = processing.run('native:buffer', {
+            'INPUT': source_grid,
+            'DISTANCE': distance,
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
+
+        buffer_result_negative = processing.run('native:buffer', {
+            'INPUT': source_grid,
+            'DISTANCE': -distance,
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
+
+        buffer_result_difference = processing.run('native:difference', {
+            'INPUT': buffer_result_positive['OUTPUT'],
+            'OVERLAY': buffer_result_negative['OUTPUT'],
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
+
+        intersection_result = processing.run('native:intersection', {
+            'INPUT': source_buildings_fixed,
+            'OVERLAY': buffer_result_difference['OUTPUT'],
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
+
+        # Buffers the intersected polygons
+        total = 100.0 / intersection_result['OUTPUT'].featureCount() if intersection_result['OUTPUT'].featureCount() else 0
+        features = intersection_result['OUTPUT'].getFeatures()
+
+        buffer_features = []
+        for current, feature in enumerate(features):
+            if feedback.isCanceled():
+                break
+
+            geometry = feature.geometry()
+            buffered = geometry.buffer(buffer_distance, 5)
+
+            if buffered.isEmpty():
+                continue
+
+            new_feature = QgsFeature(feature)
+            new_feature.setGeometry(buffered)
+            buffer_features.append(new_feature)
+
+            feedback.setProgress(int(current * total))
+
+        buffer_layer = QgsVectorLayer("Polygon?crs=epsg:4326", "buffered", "memory")
+        pr = buffer_layer.dataProvider()
+        pr.addFeatures(buffer_features)
 
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
-                                               fields, source_multiline.wkbType(),
-                                               source_multiline.sourceCrs())
+                                               buffer_layer.fields(), buffer_layer.wkbType(),
+                                               buffer_layer.sourceCrs())
 
-        total_features = source_multiline.featureCount()
-        processed_features = 0
+        # Extracts boundaries from the grid layer
+        boundaries_result = processing.run('native:boundary', {
+            'INPUT': source_grid,
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)
 
-        for ml_feature in source_multiline.getFeatures():
-            geom_ml = ml_feature.geometry()
+        total = 100.0 / buffer_layer.featureCount() if buffer_layer.featureCount() else 0
+        poly_features = buffer_layer.getFeatures()
 
-            inside = False
-            for polygon_feature in source_polygon.getFeatures():
-                geom_polygon = polygon_feature.geometry()
-                if geom_ml.within(geom_polygon):
-                    inside = True
-                    break
+        for current, poly_feat in enumerate(poly_features):
+            if feedback.isCanceled():
+                break
 
-            ml_feature.setAttributes(ml_feature.attributes() + [inside])
-            sink.addFeature(ml_feature)
+            poly_geom = poly_feat.geometry()
 
-            processed_features += 1
-            feedback.setProgress(100.0 * processed_features / total_features)
+            line_features = boundaries_result['OUTPUT'].getFeatures()
+            for line_feat in line_features:
+                line_geom = line_feat.geometry()
+
+                if poly_geom.intersects(line_geom):
+                    intersected_geom = poly_geom.intersection(line_geom)
+
+                    if intersected_geom.wkbType() == QgsWkbTypes.LineString:
+                        new_feature = QgsFeature(line_feat)
+                        new_feature.setGeometry(intersected_geom)
+                        sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
+
+            feedback.setProgress(int(current * total))
 
         return {self.OUTPUT: dest_id}
 
@@ -136,13 +190,11 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
         return self.tr(self.groupId())
 
     def groupId(self):
-        return 'Projeto 4'
+        return 'Projeto 3'
 
     def shortHelpString(self):
-        return self.tr("""Esse algoritmo tem como objetivo determinar camadas de vetores do tipo polígono
-                          que possuem em seus atributos o nome da camada raster de input, o nome da camada 
-                          raster que está sobreposta a ela e o erro relativo entre essas duas camadas, todas
-                          agrupadas em um grupo"""
+        return self.tr("""
+                          """
                        )
     
     def tr(self, string):
@@ -150,6 +202,5 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
 
     def createInstance(self):
         return Projeto4SolucaoComplementar()
-    
     
     
