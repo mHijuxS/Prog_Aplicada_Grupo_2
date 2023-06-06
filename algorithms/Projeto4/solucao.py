@@ -145,53 +145,85 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
 
     """  
 
-    def find_features_with_same_name(self,layer):
-        name_to_feature = {}
-        for feature in layer.getFeatures():
-            if feature['nome'] not in name_to_feature:
-                name_to_feature[feature['nome']] = []
-            name_to_feature[feature['nome']].append(feature)
-        return name_to_feature
+    # def find_features_with_same_name(self,layer):
+    #     name_to_feature = {}
+    #     for feature in layer.getFeatures():
+    #         if feature['nome'] not in name_to_feature:
+    #             name_to_feature[feature['nome']] = []
+    #         name_to_feature[feature['nome']].append(feature)
+    #     return name_to_feature
 
     def find_discontinuous_features(self,layer, buffer_layer, sink, tolerance):
-        name_to_feature = self.find_features_with_same_name(layer)
+        #name_to_feature = self.find_features_with_same_name(layer)
         errors = set()
+
+        # for buffer_feature in buffer_layer.getFeatures():
+        #     buffer_geom = buffer_feature.geometry()
+        #     bbox = buffer_geom.boundingBox()
+
+        #     for features in layer.getFeatures(bbox):
+        #     #for name, features in name_to_feature.items():
+        #         if len(features) > 1:
+        #             for i in range(len(features)):
+        #                 end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
+        #                 for j in range(i + 1, len(features)):
+        #                     start_point_2 = features[j].geometry().asMultiPolyline()[0][0]
+        #                     if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+        #                         if end_point_1.distance(start_point_2) <= tolerance:
+        #                             error_pair = tuple(sorted([features[i]['fid'], features[j]['fid']]))
+        #                             errors.add(error_pair)
+                                    
+        #                             # Calcula o ponto médio
+        #                             midpoint = QgsPointXY((end_point_1.x() + start_point_2.x()) / 2, (end_point_1.y() + start_point_2.y()) / 2)
+                                    
+        #                             # Cria uma nova feição de erro
+        #                             feat = QgsFeature()
+        #                             feat.setGeometry(QgsGeometry.fromPointXY(midpoint))
+        #                             feat.setAttributes(["Erro de geometria desconectada"])
+                                    
+        #                             # Adiciona a feição à camada de erros
+        #                             sink.addFeature(feat)
+
+        # return errors
 
         for buffer_feature in buffer_layer.getFeatures():
             buffer_geom = buffer_feature.geometry()
+            bbox = buffer_geom.boundingBox()
 
-            for name, features in name_to_feature.items():
-                if len(features) > 1:
-                    for i in range(len(features)):
-                        end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
-                        for j in range(i + 1, len(features)):
-                            start_point_2 = features[j].geometry().asMultiPolyline()[0][0]
-                            if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
-                                if end_point_1.distance(start_point_2) <= tolerance:
-                                    error_pair = tuple(sorted([features[i]['fid'], features[j]['fid']]))
-                                    errors.add(error_pair)
+            # Aqui, armazene todos os recursos correspondentes em uma lista
+            features_list = [f for f in layer.getFeatures(bbox)]
+            
+            for i in range(len(features_list)):
+                end_point_1 = features_list[i].geometry().asMultiPolyline()[-1][-1]
+                for j in range(i + 1, len(features_list)):
+                    # Verifica se os nomes são iguais antes de proceder
+                    if features_list[i]['nome'] == features_list[j]['nome']:
+                        start_point_2 = features_list[j].geometry().asMultiPolyline()[0][0]
+                        if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+                            if end_point_1.distance(start_point_2) <= tolerance:
+                                error_pair = tuple(sorted([features_list[i]['fid'], features_list[j]['fid']]))
+                                errors.add(error_pair)
                                     
-                                    # Calcula o ponto médio
-                                    midpoint = QgsPointXY((end_point_1.x() + start_point_2.x()) / 2, (end_point_1.y() + start_point_2.y()) / 2)
+                                # Calcula o ponto médio
+                                midpoint = QgsPointXY((end_point_1.x() + start_point_2.x()) / 2, (end_point_1.y() + start_point_2.y()) / 2)
                                     
-                                    # Cria uma nova feição de erro
-                                    feat = QgsFeature()
-                                    feat.setGeometry(QgsGeometry.fromPointXY(midpoint))
-                                    feat.setAttributes(["Erro de geometria desconectada"])
+                                # Cria uma nova feição de erro
+                                feat = QgsFeature()
+                                feat.setGeometry(QgsGeometry.fromPointXY(midpoint))
+                                feat.setAttributes(["Erro de geometria desconectada"])
                                     
-                                    # Adiciona a feição à camada de erros
-                                    sink.addFeature(feat)
-
-        return errors
-
-
+                                # Adiciona a feição à camada de erros
+                                sink.addFeature(feat)
+   
+    
     def find_features_with_different_names(self,layer, buffer_layer, sink):
         errors = set()
         
         for buffer_feature in buffer_layer.getFeatures():
             buffer_geom = buffer_feature.geometry()
-
-            features = [feature for feature in layer.getFeatures()]
+            bbox = buffer_geom.boundingBox()
+            
+            features = [feature for feature in layer.getFeatures(bbox)]
             for i in range(len(features) - 1):
                 end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
                 start_point_2 = features[i+1].geometry().asMultiPolyline()[0][0]
