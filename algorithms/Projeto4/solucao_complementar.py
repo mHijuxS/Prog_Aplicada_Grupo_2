@@ -74,7 +74,7 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
         )
         self.addParameter(
             QgsProcessingParameterDistance(
-                self.DISTANCE, 'Distância do Buffer', defaultValue=0.0001)
+                self.DISTANCE, 'Distância do Buffer', defaultValue=0.000001)
         )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
