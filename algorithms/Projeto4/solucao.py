@@ -35,41 +35,21 @@ __revision__ = '$Format:%H$'
 import pandas as pd
 import geopandas as gpd
 
-from qgis import processing
-from qgis.utils import iface
-from PyQt5.QtCore import QVariant
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QVariant, QCoreApplication
 from qgis.core import (QgsProcessing,
-                       QgsProject,
                        QgsWkbTypes,
-                       QgsProcessingMultiStepFeedback,
-                       QgsProcessingUtils,
                        QgsVectorLayer,
-                       QgsFeatureSink,
-                       QgsExpression,
-                       QgsSpatialIndex,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterFile,
-                       QgsProcessingParameterVectorLayer,
-                       QgsCoordinateReferenceSystem,
-                       QgsProcessingParameterRasterLayer,
-                       QgsVectorFileWriter,
-                       QgsCoordinateTransform,
                        QgsWkbTypes,
                        QgsGeometry,
                        QgsPointXY,
                        QgsFields,
-                       QgsFeature,
                        QgsField,
-                       QgsRaster,
-                       QgsMarkerSymbol,
-                       QgsCategorizedSymbolRenderer,
-                       QgsRendererCategory,
-                       QgsSymbol,
+                       QgsFeature,
+                       QgsProcessingParameterNumber,
                        QgsProcessingParameterFeatureSink
                     )
-
 
 class Projeto4Solucao(QgsProcessingAlgorithm):
 
@@ -77,170 +57,43 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
     Definindo as constantes
     """
     
-    # INPUTS 
-    INPUT_DRAINAGES = 'INPUT_DRAINAGES'
-    INPUT_SINK_SPILL = 'INPUT_SINK_SPILL'
-    INPUT_WATER_BODY = 'INPUT_WATER'
-    INPUT_CANAL = 'INPUT_CANAL'
+    MOLDURA_LAYER = 'MOLDURA_LAYER'
+    LINHAS_LAYER = 'LINHAS_LAYER'
+    TOLERANCE = 'TOLERANCE'
+    BUFFER_DISTANCE = 'BUFFER_DISTANCE'
+    OUTPUT = 'OUTPUT'
 
-    # OUTPUTS
-    POINTFLAGS = 'POINTFLAGS'
-    LINEFLAGS = 'LINEFLAGS'
-    POLYGONFLAGS = 'POLYGONFLAGS'
-      
     def initAlgorithm(self, config=None):
-
-        #INPUTS
-        self.addParameter(QgsProcessingParameterFeatureSource(self.INPUT_DRAINAGES, 
-                                                            'Drenagens',
-                                                            types=[QgsProcessing.TypeVectorLine]))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.INPUT_SINK_SPILL, 
-                                                            'Sumidouros e Vertedouros', 
-                                                             types=[QgsProcessing.TypeVectorPoint]))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.INPUT_CANAL, 
-                                                            'Canais', 
-                                                             types=[QgsProcessing.TypeVectorLine]))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.INPUT_WATER_BODY, 
-                                                            'Massa de Agua', 
-                                                            types=[QgsProcessing.TypeVectorPolygon]))
-        
-        #OUTPUTS
-        self.addParameter(QgsProcessingParameterFeatureSink(self.POINTFLAGS, 'Erros pontuais'))
-        self.addParameter(QgsProcessingParameterFeatureSink(self.LINEFLAGS, 'Erros em linhas'))
-        self.addParameter(QgsProcessingParameterFeatureSink(self.POLYGONFLAGS, 'Erros em polígonos'))
-
+        self.addParameter(QgsProcessingParameterFeatureSource(self.MOLDURA_LAYER, 'Camada Moldura', [QgsProcessing.TypeVectorPolygon]))
+        self.addParameter(QgsProcessingParameterFeatureSource(self.LINHAS_LAYER, 'Camada Linhas', [QgsProcessing.TypeVectorLine]))
+        self.addParameter(QgsProcessingParameterNumber(self.TOLERANCE, 'Tolerance', minValue=0.0, defaultValue=0.0001,type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterNumber(self.BUFFER_DISTANCE, 'Buffer Distance', minValue=0.0, defaultValue=0.00002,type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterFeatureSink(self.OUTPUT, 'Camada de erros', QgsProcessing.TypeVectorPoint))
 
   
       
     def processAlgorithm(self, parameters, context, feedback):
-        #Store the input variables
-        drains = self.parameterAsSource(parameters,
-                                        self.INPUT_DRAINAGES,
-                                        context)
-        sink_spills_points = self.parameterAsSource(parameters,
-                                                    self.INPUT_SINK_SPILL,
-                                                    context)
-        water_body = self.parameterAsSource(parameters,
-                                            self.INPUT_WATER_BODY,
-                                            context)
-        canals = self.parameterAsSource(parameters,
-                                        self.INPUT_CANAL,
-                                        context)
-        
+        moldura_layer = self.parameterAsVectorLayer(parameters, self.MOLDURA_LAYER, context)
+        linhas_layer = self.parameterAsVectorLayer(parameters, self.LINHAS_LAYER, context)
+        tolerance = self.parameterAsDouble(parameters, self.TOLERANCE, context)
+        buffer_distance = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
 
-        # Outputs terão um campo de atributo explicando a razão da flag
         fields = QgsFields()
-        fields.append(QgsField("Motivo", QVariant.String))
+        fields.append(QgsField('new_field2', QVariant.String))
 
-        # Configurando os Outputs 
-        (sink_point, dest_id_point) = self.parameterAsSink(parameters,
-                                                           self.POINTFLAGS,
-                                                           context,
-                                                           fields,
-                                                           QgsWkbTypes.Point,
-                                                           drains.sourceCrs()
-                                                           )
-        
-        (sink_line, dest_id_line) = self.parameterAsSink(parameters,
-                                                         self.LINEFLAGS,
-                                                         context,
-                                                         fields,
-                                                         QgsWkbTypes.LineString,
-                                                         drains.sourceCrs()
-                                                         ) 
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                                fields, QgsWkbTypes.Point, moldura_layer.sourceCrs())
 
-        (sink_polygon, dest_id_polygon) = self.parameterAsSink(parameters,
-                                                               self.POLYGONFLAGS,
-                                                               context,
-                                                               fields,
-                                                               QgsWkbTypes.Polygon,
-                                                               drains.sourceCrs()
-                                                               )
-        
-        
-        
+        buffer_layer = self.create_buffer_layer(moldura_layer, buffer_distance)
+        self.find_discontinuous_features(linhas_layer, buffer_layer, sink, tolerance)
+        self.find_features_with_different_names(linhas_layer, buffer_layer, sink)
 
-        
-        # Calculando a estrutura das linhas
-        pointInAndOutDictionary = {}
-
-        lineCount = drains.featureCount()
-        multiStepFeedback = QgsProcessingMultiStepFeedback(2, feedback)
-        multiStepFeedback.setCurrentStep(0)
-        multiStepFeedback.setProgressText(self.tr("Calculando a estrutura das Linhas..."))
-        stepSize = 100/lineCount
-
-        # Adicionando ao dicionário a quantidade de linhas que entram e saem de um determinado ponto
-        for current, line in enumerate(drains.getFeatures()):
-            if multiStepFeedback.isCanceled():
-                break
-            geom = list(line.geometry().vertices())
-            if len(geom) == 0:
-                continue
-            first_vertex = geom[0]
-            last_vertex = geom[-1]
-
-            if first_vertex.asWkt() not in pointInAndOutDictionary:
-                pointInAndOutDictionary[first_vertex.asWkt()] = { "incoming": 0, "outgoing": 0}
-
-            if last_vertex.asWkt() not in pointInAndOutDictionary:
-                pointInAndOutDictionary[last_vertex.asWkt()] = { "incoming": 0, "outgoing": 0}
-            
-            pointInAndOutDictionary[first_vertex.asWkt()]["outgoing"] += 1
-            pointInAndOutDictionary[last_vertex.asWkt()]["incoming"] += 1
-            multiStepFeedback.setProgress(current * stepSize)
-        
-        multiStepFeedback.setCurrentStep(1)
-                
-   ###############################################################################################
-   ######################################### ITEM 1 ##############################################    
-   ###############################################################################################
-        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
-            if multiStepFeedback.isCanceled():
-                break
-            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
-            if errorMsg != '':
-                flag = QgsFeature(fields)
-                flag.setGeometry(QgsGeometry.fromWkt(point))
-                flag["Motivo"] = errorMsg
-                sink_point.addFeature(flag)
-        
-        
-        
-        
-                
-
-        for current, (point, dictCounter) in enumerate(pointInAndOutDictionary.items()):
-            if multiStepFeedback.isCanceled():
-                break
-            errorMsg = self.errorWhenCheckingInAndOut(dictCounter)
-            if errorMsg != '':
-                flag = QgsFeature(fields)
-                flag.setGeometry(QgsGeometry.fromWkt(point))
-                flag["Motivo"] = errorMsg
-                sink_point.addFeature(flag)
-
-   ###############################################################################################
-   ###################################### ITEM 2 e 3 #############################################    
-   ###############################################################################################
-
-   # TO DO
-   ########################################### ITEM 4 ############################################    
-   ###############################################################################################
-
-   ###############################################################################################
-   ######################################### ITEM 7 ##############################################    
-   ###############################################################################################
-
-
-   ##############################################################################################
-   ######################################## ITEM 8 ##############################################    
-   ###############################################################################################      
-
-                    
-        return {self.POINTFLAGS: dest_id_point,
-                self.LINEFLAGS: dest_id_line,
-                self.POLYGONFLAGS: dest_id_polygon} 
+        return {self.OUTPUT: dest_id} 
+       
+       
+       
+       
+       
         
     def tr(self, string):
         return QCoreApplication.translate('Processando', string)
@@ -269,21 +122,92 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
     FUNÇÕES AUXILIARES
 
     """  
-    def errorWhenCheckingInAndOut(self, inAndOutCounters):
-        incoming = inAndOutCounters["incoming"]
-        outgoing = inAndOutCounters["outgoing"]
-        total = incoming + outgoing
 
-        if total == 1:
-            return ''
-        if total >= 4:
-            return '4 or more lines conected to this point.'
+    def find_features_with_same_name(self,layer):
+        name_to_feature = {}
+        for feature in layer.getFeatures():
+            if feature['nome'] not in name_to_feature:
+                name_to_feature[feature['nome']] = []
+            name_to_feature[feature['nome']].append(feature)
+        return name_to_feature
+
+    def find_discontinuous_features(self,layer, buffer_layer, sink, tolerance):
+        name_to_feature = self.find_features_with_same_name(layer)
+        errors = set()
+
+        for buffer_feature in buffer_layer.getFeatures():
+            buffer_geom = buffer_feature.geometry()
+
+            for name, features in name_to_feature.items():
+                if len(features) > 1:
+                    for i in range(len(features)):
+                        end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
+                        for j in range(i + 1, len(features)):
+                            start_point_2 = features[j].geometry().asMultiPolyline()[0][0]
+                            if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+                                if end_point_1.distance(start_point_2) <= tolerance:
+                                    error_pair = tuple(sorted([features[i]['fid'], features[j]['fid']]))
+                                    errors.add(error_pair)
+                                    
+                                    # Calcula o ponto médio
+                                    midpoint = QgsPointXY((end_point_1.x() + start_point_2.x()) / 2, (end_point_1.y() + start_point_2.y()) / 2)
+                                    
+                                    # Cria uma nova feição de erro
+                                    feat = QgsFeature()
+                                    feat.setGeometry(QgsGeometry.fromPointXY(midpoint))
+                                    feat.setAttributes(["Erro de geometria desconectada"])
+                                    
+                                    # Adiciona a feição à camada de erros
+                                    sink.addFeature(feat)
+
+        return errors
+
+
+    def find_features_with_different_names(self,layer, buffer_layer, sink):
+        errors = set()
         
-        if (incoming == 0):
-            return 'Existem linhas saindo desse ponto, mas não tem linhas entrando'
+        for buffer_feature in buffer_layer.getFeatures():
+            buffer_geom = buffer_feature.geometry()
 
-        if (outgoing == 0):
-            return 'Existem linhas entrando nesse ponto, mas não tem linhas saindo dele'
+            features = [feature for feature in layer.getFeatures()]
+            for i in range(len(features) - 1):
+                end_point_1 = features[i].geometry().asMultiPolyline()[-1][-1]
+                start_point_2 = features[i+1].geometry().asMultiPolyline()[0][0]
+                
+                if buffer_geom.contains(end_point_1) and buffer_geom.contains(start_point_2):
+                    if features[i]['nome'] != features[i+1]['nome']:
+                        error_pair = tuple(sorted([features[i]['fid'], features[i+1]['fid']]))
+                        errors.add(error_pair)
+                        
+                        # Cria uma nova feição de erro
+                        feat = QgsFeature()
+                        feat.setGeometry(QgsGeometry.fromPointXY(end_point_1))
+                        feat.setAttributes(["Erro de geometrias conectadas com conjuntos de atributos distintos."])
 
-        return ''
-    
+                        # Adiciona a feição à camada de erros
+                        sink.addFeature(feat)
+        return errors
+
+
+    def create_buffer_layer(self,moldura_layer, buffer_distance):
+        buffer_layer = QgsVectorLayer("Polygon", "buffer_layer", "memory")
+        pr = buffer_layer.dataProvider()
+
+        for moldura_feature in moldura_layer.getFeatures():
+            moldura_geom = moldura_feature.geometry()
+
+            # Desconstruir a geometria do polígono em linhas individuais
+            for ring in moldura_geom.asMultiPolygon():
+                for line in ring:
+                    line_geom = QgsGeometry.fromPolylineXY(line)
+
+                    # Cria um buffer em torno da linha
+                    buffer_geom = line_geom.buffer(buffer_distance, 5)
+
+                    # Cria e adiciona a feição de buffer
+                    buffer_feature = QgsFeature()
+                    buffer_feature.setGeometry(buffer_geom)
+                    pr.addFeature(buffer_feature)
+
+        buffer_layer.updateExtents() 
+        return buffer_layer
