@@ -55,131 +55,87 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingException)
 
 from qgis import processing
+from qgis.PyQt.QtCore import QCoreApplication
 
 class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
     BUILDINGS = 'BUILDINGS'
-    GRID = 'GRID'
+    BOUNDARIES = 'BOUNDARIES'
     DISTANCE = 'DISTANCE'
-    BUFFER_DISTANCE = 'BUFFER_DISTANCE'
     OUTPUT = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
         self.addParameter(
             QgsProcessingParameterVectorLayer(
-                self.BUILDINGS, 'Camada de Edificações', [QgsProcessing.TypeVectorPolygon]))
+                self.BUILDINGS, 'Camada de Edificações', [QgsProcessing.TypeVectorPolygon])
+        )
         self.addParameter(
             QgsProcessingParameterVectorLayer(
-                self.GRID, 'Camada de Molduras', [QgsProcessing.TypeVectorPolygon]))
-        self.addParameter(
-            QgsProcessingParameterNumber(
-                self.DISTANCE, 'Distância de deslocamento', minValue=0, defaultValue=20))
+                self.BOUNDARIES, 'Camada de Molduras', [QgsProcessing.TypeVectorPolygon])
+        )
         self.addParameter(
             QgsProcessingParameterDistance(
-                self.BUFFER_DISTANCE,
-                'Buffer Distance',
-                defaultValue=1.0
-            )
+                self.DISTANCE, 'Distância do Buffer', defaultValue=0.01)
         )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
-                self.OUTPUT, 'Intersecções'))
+                self.OUTPUT, 'Camada de Saída')
+        )
 
     def processAlgorithm(self, parameters, context, feedback):
-        source_buildings = self.parameterAsVectorLayer(parameters, self.BUILDINGS, context)
-        source_grid = self.parameterAsVectorLayer(parameters, self.GRID, context)
+        buildings_layer = self.parameterAsVectorLayer(parameters, self.BUILDINGS, context)
+        boundaries_layer = self.parameterAsVectorLayer(parameters, self.BOUNDARIES, context)
         distance = self.parameterAsDouble(parameters, self.DISTANCE, context)
-        buffer_distance = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
 
-        fix_result = processing.run('native:fixgeometries', {
-            'INPUT': source_buildings,
+        if buildings_layer is None or boundaries_layer is None:
+            raise QgsProcessingException('Invalid input layer.')
+
+        # Extrair bordas dos polígonos da camada de molduras
+        (boundaries_sink, boundaries_dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                                                     QgsFields(), QgsWkbTypes.MultiLineString,
+                                                                     buildings_layer.sourceCrs())
+
+        boundaries_result = processing.run('native:boundary', {
+            'INPUT': boundaries_layer,
             'OUTPUT': 'memory:'
         }, context=context, feedback=feedback)
 
-        source_buildings_fixed = fix_result['OUTPUT']
+        for feature in boundaries_result['OUTPUT'].getFeatures():
+            boundaries_sink.addFeature(feature)
 
-        buffer_result_positive = processing.run('native:buffer', {
-            'INPUT': source_grid,
-            'DISTANCE': distance,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)
+        # Criar buffer e interseção
+        (buffer_intersect_sink, buffer_intersect_dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                                                                 boundaries_result['OUTPUT'].fields(),
+                                                                                 boundaries_result['OUTPUT'].wkbType(),
+                                                                                 boundaries_result['OUTPUT'].sourceCrs())
 
-        buffer_result_negative = processing.run('native:buffer', {
-            'INPUT': source_grid,
-            'DISTANCE': -distance,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)
+        total = 100.0 / buildings_layer.featureCount() if buildings_layer.featureCount() else 0
 
-        buffer_result_difference = processing.run('native:difference', {
-            'INPUT': buffer_result_positive['OUTPUT'],
-            'OVERLAY': buffer_result_negative['OUTPUT'],
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)
-
-        intersection_result = processing.run('native:intersection', {
-            'INPUT': source_buildings_fixed,
-            'OVERLAY': buffer_result_difference['OUTPUT'],
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)
-
-        # Buffers the intersected polygons
-        total = 100.0 / intersection_result['OUTPUT'].featureCount() if intersection_result['OUTPUT'].featureCount() else 0
-        features = intersection_result['OUTPUT'].getFeatures()
-
-        buffer_features = []
-        for current, feature in enumerate(features):
+        buildings_features = buildings_layer.getFeatures()
+        for current, building_feat in enumerate(buildings_features):
             if feedback.isCanceled():
                 break
 
-            geometry = feature.geometry()
-            buffered = geometry.buffer(buffer_distance, 5)
-
-            if buffered.isEmpty():
+            # Criar buffer
+            building_geom = building_feat.geometry().buffer(distance, 5)
+            if building_geom.isEmpty():
                 continue
 
-            new_feature = QgsFeature(feature)
-            new_feature.setGeometry(buffered)
-            buffer_features.append(new_feature)
+            boundaries_features = boundaries_result['OUTPUT'].getFeatures()
+            for boundary_feat in boundaries_features:
+                boundary_geom = boundary_feat.geometry()
 
-            feedback.setProgress(int(current * total))
-
-        buffer_layer = QgsVectorLayer("Polygon?crs=epsg:4326", "buffered", "memory")
-        pr = buffer_layer.dataProvider()
-        pr.addFeatures(buffer_features)
-
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
-                                               buffer_layer.fields(), buffer_layer.wkbType(),
-                                               buffer_layer.sourceCrs())
-
-        # Extracts boundaries from the grid layer
-        boundaries_result = processing.run('native:boundary', {
-            'INPUT': source_grid,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)
-
-        total = 100.0 / buffer_layer.featureCount() if buffer_layer.featureCount() else 0
-        poly_features = buffer_layer.getFeatures()
-
-        for current, poly_feat in enumerate(poly_features):
-            if feedback.isCanceled():
-                break
-
-            poly_geom = poly_feat.geometry()
-
-            line_features = boundaries_result['OUTPUT'].getFeatures()
-            for line_feat in line_features:
-                line_geom = line_feat.geometry()
-
-                if poly_geom.intersects(line_geom):
-                    intersected_geom = poly_geom.intersection(line_geom)
+                if building_geom.intersects(boundary_geom):
+                    intersected_geom = building_geom.intersection(boundary_geom)
 
                     if intersected_geom.wkbType() == QgsWkbTypes.LineString:
-                        new_feature = QgsFeature(line_feat)
+                        new_feature = QgsFeature(boundary_feat)
                         new_feature.setGeometry(intersected_geom)
-                        sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
+                        buffer_intersect_sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
 
             feedback.setProgress(int(current * total))
 
-        return {self.OUTPUT: dest_id}
+        return {self.OUTPUT: buffer_intersect_dest_id}
+
 
     def name(self):
         return 'Solução Complementar do Projeto 4'
@@ -191,7 +147,7 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
         return self.tr(self.groupId())
 
     def groupId(self):
-        return 'Projeto 3'
+        return 'Projeto 4'
 
     def shortHelpString(self):
         return self.tr("""
