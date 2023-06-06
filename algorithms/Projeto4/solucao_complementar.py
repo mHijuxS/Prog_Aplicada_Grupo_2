@@ -74,7 +74,7 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
         )
         self.addParameter(
             QgsProcessingParameterDistance(
-                self.DISTANCE, 'Distância do Buffer', defaultValue=0.01)
+                self.DISTANCE, 'Distância do Buffer', defaultValue=0.000001)
         )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
@@ -89,20 +89,21 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
         if buildings_layer is None or boundaries_layer is None:
             raise QgsProcessingException('Invalid input layer.')
 
-        # Extrair bordas dos polígonos da camada de molduras
-        (boundaries_sink, boundaries_dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
-                                                                     QgsFields(), QgsWkbTypes.MultiLineString,
-                                                                     buildings_layer.sourceCrs())
-
+        # Extract overlapping boundaries
         boundaries_result = processing.run('native:boundary', {
             'INPUT': boundaries_layer,
             'OUTPUT': 'memory:'
         }, context=context, feedback=feedback)
 
-        for feature in boundaries_result['OUTPUT'].getFeatures():
-            boundaries_sink.addFeature(feature)
+        overlapping_boundaries = []
+        features = [f for f in boundaries_result['OUTPUT'].getFeatures()]
+        for i in range(len(features)):
+            for j in range(i+1, len(features)):
+                overlap = features[i].geometry().intersection(features[j].geometry())
+                if overlap is not None and not overlap.isEmpty() and overlap.type() == QgsWkbTypes.LineGeometry:
+                    overlapping_boundaries.append(overlap)
 
-        # Criar buffer e interseção
+        # Create buffer and intersection
         (buffer_intersect_sink, buffer_intersect_dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
                                                                                  boundaries_result['OUTPUT'].fields(),
                                                                                  boundaries_result['OUTPUT'].wkbType(),
@@ -115,20 +116,16 @@ class Projeto4SolucaoComplementar(QgsProcessingAlgorithm):
             if feedback.isCanceled():
                 break
 
-            # Criar buffer
+            # Create buffer
             building_geom = building_feat.geometry().buffer(distance, 5)
             if building_geom.isEmpty():
                 continue
 
-            boundaries_features = boundaries_result['OUTPUT'].getFeatures()
-            for boundary_feat in boundaries_features:
-                boundary_geom = boundary_feat.geometry()
-
+            for boundary_geom in overlapping_boundaries:
                 if building_geom.intersects(boundary_geom):
                     intersected_geom = building_geom.intersection(boundary_geom)
-
                     if intersected_geom.wkbType() == QgsWkbTypes.LineString:
-                        new_feature = QgsFeature(boundary_feat)
+                        new_feature = QgsFeature()
                         new_feature.setGeometry(intersected_geom)
                         buffer_intersect_sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
 
