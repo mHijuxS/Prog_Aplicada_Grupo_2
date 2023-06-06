@@ -65,11 +65,29 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
     OUTPUT = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
-        self.addParameter(QgsProcessingParameterFeatureSource(self.MOLDURA_LAYER, 'Camada Moldura', [QgsProcessing.TypeVectorPolygon]))
-        self.addParameter(QgsProcessingParameterFeatureSource(self.LINHAS_LAYER, 'Camada Linhas', [QgsProcessing.TypeVectorLine]))
-        self.addParameter(QgsProcessingParameterNumber(self.TOLERANCE, 'Tolerance', minValue=0.0, defaultValue=0.0001,type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.BUFFER_DISTANCE, 'Buffer Distance', minValue=0.0, defaultValue=0.00002,type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterFeatureSink(self.OUTPUT, 'Camada de erros', QgsProcessing.TypeVectorPoint))
+        self.addParameter(QgsProcessingParameterFeatureSource(self.MOLDURA_LAYER, 
+                                                              'Camada Moldura', 
+                                                              [QgsProcessing.TypeVectorPolygon]))
+
+        self.addParameter(QgsProcessingParameterFeatureSource(self.LINHAS_LAYER, 
+                                                              'Camada Linhas', 
+                                                              [QgsProcessing.TypeVectorLine]))
+
+        self.addParameter(QgsProcessingParameterNumber(self.TOLERANCE, 
+                                                       'Tolerance', 
+                                                       minValue=0.0, 
+                                                       defaultValue=0.0001,
+                                                       type=QgsProcessingParameterNumber.Double))
+
+        self.addParameter(QgsProcessingParameterNumber(self.BUFFER_DISTANCE, 
+                                                       'Buffer Distance', 
+                                                       minValue=0.0, 
+                                                       defaultValue=0.00002,
+                                                       type=QgsProcessingParameterNumber.Double))
+
+        self.addParameter(QgsProcessingParameterFeatureSink(self.OUTPUT, 
+                                                            'Camada de erros', 
+                                                            QgsProcessing.TypeVectorPoint))
 
   
       
@@ -81,9 +99,12 @@ class Projeto4Solucao(QgsProcessingAlgorithm):
 
         fields = QgsFields()
         fields.append(QgsField('Tipo de Erro', QVariant.String))
-
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
-                                                fields, QgsWkbTypes.Point, moldura_layer.sourceCrs())
+        (sink, dest_id) = self.parameterAsSink(parameters, 
+                                               self.OUTPUT, 
+                                               context,
+                                               fields, 
+                                               QgsWkbTypes.Point, 
+                                               moldura_layer.sourceCrs())
 
         buffer_layer = self.create_buffer_layer(moldura_layer, buffer_distance)
         self.find_discontinuous_features(linhas_layer, buffer_layer, sink, tolerance)
